@@ -156,6 +156,7 @@ let db={users:{},players:{}};
 let acc=localStorage.getItem("shanhe_v5_acc")||"";
 let pwdCache=localStorage.getItem("shanhe_v5_pwd")||"";
 let page="home", selectedTile="", mapCenter={x:150,y:150}, activeEvent="catchup", worldSize=300;
+let heroFilterStar="all", heroFilterType="all", heroFilterStatus="all", heroSortMode="star";
 let activeChat="world", chatTimer=null, chatRendered=false;
 let chatMessages={world:[],alliance:[],private:[]};
 let chatLastId={world:0,alliance:0,private:0};
@@ -305,7 +306,13 @@ function newPlayer(name,a){
  return {
   name,a,createdAt:now(),alliance:"",center:{x:150,y:150},seen:{},map:{},selectedTeam:"",worldSize:300,
   res:{粮草:15000,木材:10000,石料:10000,铁矿:9000,铜钱:8000,兵源:3500,绑定元宝:1800,招募令:8,限定招募令:3,将魂:0,战法残卷:120,赛季功勋:0,强者令:0},
-  buildings:{官府:1,仓库:1,军营:1,厨房:1,招贤馆:1,城墙:1,耕地:1,林场:1,采矿场:1},
+  buildings:{官府:1,仓库:1,军营:1,厨房:1,招贤馆:1,城墙:1},
+productionBuildings:{
+ 耕地:{count:1,lv:1},
+ 林场:{count:1,lv:1},
+ 采矿场:{count:1,lv:1},
+ 坊市:{count:1,lv:1}
+},
   heroes:[inst(pick(starter).id),inst(pick(starter).id),inst(pick(starter).id)],
   troopStock:{民兵:100,步兵:100,弓兵:0,枪兵:0,骑兵:0,器械:0},
   teams:[],nextTeamNo:1,reports:[],stats:{enemyWins:0},
@@ -359,9 +366,25 @@ function migratePlayer(){
  if(q.bag.传说碎片宝箱==null)q.bag.传说碎片宝箱=0;
  if(q.bag.五星异世自选箱==null)q.bag.五星异世自选箱=0;
  if(q.bag.六星异世自选箱==null)q.bag.六星异世自选箱=0;
- if(!q.buildings.耕地)q.buildings.耕地=1;
- if(!q.buildings.林场)q.buildings.林场=1;
- if(!q.buildings.采矿场)q.buildings.采矿场=1;
+if(!q.productionBuildings){
+ q.productionBuildings={
+  耕地:{count:1,lv:1},
+  林场:{count:1,lv:1},
+  采矿场:{count:1,lv:1},
+  坊市:{count:1,lv:1}
+ };
+}
+
+for(let k of ["耕地","林场","采矿场","坊市"]){
+ if(!q.productionBuildings[k]){
+  q.productionBuildings[k]={count:1,lv:1};
+ }
+ if(!q.productionBuildings[k].count)q.productionBuildings[k].count=1;
+ if(!q.productionBuildings[k].lv)q.productionBuildings[k].lv=1;
+ if(q.buildings&&q.buildings[k]){
+  delete q.buildings[k];
+ }
+}
  save();
 }
 function log(t){p().logs.unshift(new Date().toLocaleTimeString()+" - "+t);p().logs=p().logs.slice(0,120);save();renderLogs()}
@@ -417,10 +440,7 @@ function buildingData(k,lv){
   军营:{cost:{木材:800,石料:500,铁矿:800,铜钱:450},gain:`解锁兵种。当前可征：${unlockedTroops().join("、")}`},
   厨房:{cost:{木材:450,石料:300,铁矿:200,铜钱:350},gain:"解锁高级军粮。"},
   招贤馆:{cost:{木材:500,石料:400,铁矿:300,铜钱:800},gain:"提高招募、碎片兑换与武将培养效率。"},
-  城墙:{cost:{木材:450,石料:1000,铁矿:400,铜钱:350},gain:"提高驻守地块与主城防御。"},
-  耕地:{cost:{木材:600,石料:300,铜钱:500},gain:"每分钟产出粮草。等级越高，粮草越多。"},
-  林场:{cost:{粮草:500,石料:300,铜钱:500},gain:"每分钟产出木材。等级越高，木材越多。"},
-  采矿场:{cost:{粮草:600,木材:500,铜钱:700},gain:"每分钟产出石料和铁矿。等级越高，矿产越多。"}
+  城墙:{cost:{木材:450,石料:1000,铁矿:400,铜钱:350},gain:"提高驻守地块与主城防御。"}
  }[k];
 
  let cost={};
@@ -429,40 +449,150 @@ function buildingData(k,lv){
 }
 function collectProduction(showLog=false){
  if(!acc||!p())return;
+
  let q=p();
+
  if(!q.lastProduce)q.lastProduce=now();
 
+ if(!q.productionBuildings){
+  q.productionBuildings={
+   耕地:{count:1,lv:1},
+   林场:{count:1,lv:1},
+   采矿场:{count:1,lv:1},
+   坊市:{count:1,lv:1}
+  };
+ }
+
  let diff=now()-q.lastProduce;
+
  if(diff<60000)return;
 
  let minutes=Math.min(720,Math.floor(diff/60000));
+
  q.lastProduce+=minutes*60000;
 
- let field=q.buildings.耕地||1;
- let wood=q.buildings.林场||1;
- let mine=q.buildings.采矿场||1;
+ let field=productionPower("耕地");
+ let wood=productionPower("林场");
+ let mine=productionPower("采矿场");
+ let market=productionPower("坊市");
 
  let reward={
   粮草:minutes*field*50,
   木材:minutes*wood*35,
   石料:minutes*mine*25,
-  铁矿:minutes*mine*25
+  铁矿:minutes*mine*25,
+  铜钱:minutes*market*40
  };
 
  gainRes(reward);
 
  if(showLog){
-  log(`资源建筑产出：${costText(reward)}`);
+  log(`生产建筑产出：${costText(reward)}`);
  }else{
   save();
   renderRes();
  }
 }
+
+const productionBuildingData={
+ 耕地:{
+  buildCost:{木材:800,石料:400,铜钱:600},
+  upCost:{木材:600,石料:300,铜钱:500},
+  gain:"自动生产粮草。数量和等级越高，粮草产出越多。"
+ },
+ 林场:{
+  buildCost:{粮草:700,石料:400,铜钱:600},
+  upCost:{粮草:500,石料:300,铜钱:500},
+  gain:"自动生产木材。数量和等级越高，木材产出越多。"
+ },
+ 采矿场:{
+  buildCost:{粮草:900,木材:700,铜钱:800},
+  upCost:{粮草:600,木材:500,铜钱:700},
+  gain:"自动生产石料和铁矿。数量和等级越高，矿产越多。"
+ },
+ 坊市:{
+  buildCost:{木材:1000,石料:800,铁矿:500},
+  upCost:{木材:800,石料:600,铁矿:400},
+  gain:"自动生产铜钱。数量和等级越高，铜钱产出越多。"
+ }
+};
+
+function scaleCost(base,multi){
+ let cost={};
+ for(let k in base){
+  cost[k]=Math.ceil(base[k]*multi);
+ }
+ return cost;
+}
+
+function productionBuildCost(name){
+ let b=p().productionBuildings[name];
+ return scaleCost(productionBuildingData[name].buildCost,b.count);
+}
+
+function productionUpgradeCost(name){
+ let b=p().productionBuildings[name];
+ return scaleCost(productionBuildingData[name].upCost,b.lv);
+}
+
+function productionPower(name){
+ let b=p().productionBuildings[name];
+ return b.count*b.lv;
+}
 function renderHome(){
  let html=`<h2>主页建筑</h2><div class="grid three">`;
- for(let [k,lv] of Object.entries(p().buildings)){let d=buildingData(k,lv);html+=`<div class="stat"><h3>${k} Lv.${lv}</h3><p class="muted">增益：${d.gain}</p><p>升级消耗：${costText(d.cost)}</p><button onclick="upBuild('${k}')">升级</button></div>`}
- html+=`</div><hr class="hr"><h2>邮箱 ${unreadMailCount()?`<span class="mail-badge">${unreadMailCount()}</span>`:""}</h2><div class="stat"><p class="muted">限时活动、成长奖励、强者令兑换都会先发到邮箱，再由玩家领取附件。</p><button onclick="claimAllMail()">一键领取全部附件</button></div><br><div class="list">${p().mails.map(m=>`<div class="item"><h3>${m.title}${m.claimed?"":"<span class='mail-badge'>未领</span>"}</h3><p>${m.content}</p><p class="muted">${m.time}</p><p>附件：${m.reward?rewardText(m.reward):"无"}</p><button ${m.claimed?"disabled":""} onclick="claimMail('${m.id}')">领取附件</button></div>`).join("")||"<div class='item muted'>暂无邮件。</div>"}</div>`;
- document.getElementById("page-home").innerHTML=html
+
+ for(let [k,lv] of Object.entries(p().buildings)){
+  let d=buildingData(k,lv);
+
+  html+=`<div class="stat">
+   <h3>${k} Lv.${lv}</h3>
+   <p class="muted">增益：${d.gain}</p>
+   <p>升级消耗：${costText(d.cost)}</p>
+   <button onclick="upBuild('${k}')">升级</button>
+  </div>`;
+ }
+
+ html+=`</div>
+ <hr class="hr">
+ <h2>生产建筑</h2>
+ <p class="muted">生产建筑可以重复建造，也可以升级。数量 × 等级 决定每分钟产出。</p>
+ <div class="grid three">`;
+
+ for(let name of ["耕地","林场","采矿场","坊市"]){
+  let b=p().productionBuildings[name];
+  let data=productionBuildingData[name];
+
+  html+=`<div class="stat">
+   <h3>${name} ×${b.count} ｜ Lv.${b.lv}</h3>
+   <p class="muted">${data.gain}</p>
+   <p>产能：${productionPower(name)}</p>
+   <p>新建消耗：${costText(productionBuildCost(name))}</p>
+   <p>升级消耗：${costText(productionUpgradeCost(name))}</p>
+   <button onclick="buildProduction('${name}')">再建一个</button>
+   <button onclick="upgradeProduction('${name}')">升级</button>
+  </div>`;
+ }
+
+ html+=`</div>
+ <hr class="hr">
+ <h2>邮箱 ${unreadMailCount()?`<span class="mail-badge">${unreadMailCount()}</span>`:""}</h2>
+ <div class="stat">
+  <p class="muted">限时活动、成长奖励、强者令兑换、GM奖励都会先发到邮箱，再由玩家领取附件。</p>
+  <button onclick="claimAllMail()">一键领取全部附件</button>
+ </div>
+ <br>
+ <div class="list">
+  ${p().mails.map(m=>`<div class="item">
+   <h3>${m.title}${m.claimed?"":"<span class='mail-badge'>未领</span>"}</h3>
+   <p>${m.content}</p>
+   <p class="muted">${m.time}</p>
+   <p>附件：${m.reward?rewardText(m.reward):"无"}</p>
+   <button ${m.claimed?"disabled":""} onclick="claimMail('${m.id}')">领取附件</button>
+  </div>`).join("")||"<div class='item muted'>暂无邮件。</div>"}
+ </div>`;
+
+ document.getElementById("page-home").innerHTML=html;
 }
 function upBuild(k){let lv=p().buildings[k],d=buildingData(k,lv);if(!spend(d.cost))return;p().buildings[k]++;log(`${k}升级到 Lv.${p().buildings[k]}`);renderAll()}
 function ownedCount(q=p()){return Object.values(q.map).filter(t=>t.owner===q.name).length}
@@ -476,6 +606,29 @@ function revealNear(){
   let x=mapCenter.x+dx,y=mapCenter.y+dy;
   if(x>=0&&y>=0&&x<worldSize&&y<worldSize)p().seen[x+"_"+y]=true;
  }
+}
+function buildProduction(name){
+ let cost=productionBuildCost(name);
+
+ if(!spend(cost))return;
+
+ p().productionBuildings[name].count++;
+
+ log(`新建${name}，当前数量 ${p().productionBuildings[name].count}。`);
+
+ renderAll();
+}
+
+function upgradeProduction(name){
+ let cost=productionUpgradeCost(name);
+
+ if(!spend(cost))return;
+
+ p().productionBuildings[name].lv++;
+
+ log(`${name}升级到 Lv.${p().productionBuildings[name].lv}。`);
+
+ renderAll();
 }
 function moveMap(dx,dy){
  mapCenter.x=Math.max(2,Math.min(worldSize-3,mapCenter.x+dx));
@@ -534,13 +687,214 @@ function renderBarracks(){let rows=Object.entries(troopTypes).map(([name,d])=>{l
 function train(name){let d=troopTypes[name];if(!spend(d.cost))return;p().troopStock[name]=(p().troopStock[name]||0)+50;log(`征募${name} 50人。`);renderAll()}
 
 function renderTeams(){let availableHeroes=p().heroes.filter(u=>!u.assignedTeam);let options=availableHeroes.map(u=>`<option value="${u.uid}">${h(u.id).name} Lv.${u.lv}</option>`).join("");let troopInputs=Object.keys(troopTypes).map(k=>`<div class="field"><label>${k}，库存${p().troopStock[k]||0}</label><input id="team_${k}" type="number" min="0" step="50" value="0"></div>`).join("");document.getElementById("page-teams").innerHTML=`<h2>军队</h2><div class="grid two"><div class="stat"><h3>创建编队</h3><p class="muted">每个队伍必须有武将带领，至少 50 兵。军队名自动为 1队、2队、3队。</p><select id="teamHero">${options}</select><br><br>${troopInputs}<button onclick="createTeam()">创建队伍</button></div><div class="stat"><h3>兵种克制</h3><p>步兵克弓兵，弓兵克骑兵，骑兵克步兵，枪兵克骑兵，器械克城防。</p><p class="muted">武将战法只作用于本队。占领地块后，该队会变成驻守状态。</p></div></div><hr class="hr"><h2>已有军队</h2><div class="list">${p().teams.map(teamCard).join("")||"<div class='item muted'>暂无队伍。</div>"}</div>`}
-function teamCard(tm){let hero=p().heroes.find(u=>u.uid===tm.heroUid),ht=hero?h(hero.id):null;return `<div class="item"><h3>${tm.name}｜${tm.status}</h3><p>带队武将：${ht?ht.name:"无"} ${ht&&ht.tag?`<span class="tag">${ht.tag}</span>`:""}</p><p>兵力：${tm.total}｜主力：${mainTroop(tm)}｜军势：${teamPower(tm)}</p><p class="muted">兵种：${Object.entries(tm.troops).filter(x=>x[1]>0).map(([k,v])=>`${k}${v}`).join("，")}</p><button onclick="disbandTeam('${tm.id}')">解散返还士兵</button></div>`}
+function teamCard(tm){
+ let hero=p().heroes.find(u=>u.uid===tm.heroUid);
+ let ht=hero?h(hero.id):null;
+
+ let freeHeroes=p().heroes.filter(u=>!u.assignedTeam||u.uid===tm.heroUid);
+
+ let heroOptions=freeHeroes.map(u=>{
+  let hh=h(u.id);
+  return `<option value="${u.uid}" ${u.uid===tm.heroUid?"selected":""}>${hh.name} Lv.${u.lv}</option>`;
+ }).join("");
+
+ return `<div class="item">
+  <h3>${tm.name}｜${tm.status}</h3>
+  <p>带队武将：${ht?ht.name:"无"} ${ht&&ht.tag?`<span class="tag">${ht.tag}</span>`:""}</p>
+  <p>兵力：${tm.total}｜主力：${mainTroop(tm)}｜军势：${teamPower(tm)}</p>
+  <p class="muted">兵种：${Object.entries(tm.troops).filter(x=>x[1]>0).map(([k,v])=>`${k}${v}`).join("，")}</p>
+
+  <div class="field">
+   <label>更换将领</label>
+   <select id="changeHero_${tm.id}">${heroOptions}</select>
+  </div>
+
+  <button onclick="changeTeamHero('${tm.id}')">确认更换</button>
+  <button onclick="disbandTeam('${tm.id}')">解散返还士兵</button>
+ </div>`;
+}
+
+function changeTeamHero(teamId){
+ let tm=p().teams.find(x=>x.id===teamId);
+
+ if(!tm)return alert("队伍不存在");
+
+ if(tm.status==="驻守"){
+  return alert("驻守中的队伍不能更换将领，请先在地图撤回");
+ }
+
+ let select=document.getElementById("changeHero_"+teamId);
+ let newUid=select?.value;
+
+ if(!newUid)return alert("请选择武将");
+
+ if(newUid===tm.heroUid)return alert("已经是当前将领");
+
+ let oldHero=p().heroes.find(u=>u.uid===tm.heroUid);
+ let newHero=p().heroes.find(u=>u.uid===newUid);
+
+ if(!newHero)return alert("武将不存在");
+
+ if(newHero.assignedTeam&&newHero.assignedTeam!==teamId){
+  return alert("该武将已经在其他队伍中");
+ }
+
+ if(oldHero)oldHero.assignedTeam="";
+
+ newHero.assignedTeam=teamId;
+ tm.heroUid=newUid;
+
+ log(`${tm.name}更换将领为 ${h(newHero.id).name}。`);
+
+ renderAll();
+}
 function createTeam(){let uid=teamHero.value;if(!uid)return alert("没有可用武将");let troops={},total=0;for(let k of Object.keys(troopTypes)){let v=Math.floor(Number(document.getElementById("team_"+k).value||0)/50)*50;if(v<0)v=0;if(v>(p().troopStock[k]||0))return alert(k+"库存不足");troops[k]=v;total+=v}if(total<50)return alert("至少选择50兵");for(let k in troops)p().troopStock[k]-=troops[k];let no=p().nextTeamNo++;let tm={id:"team"+now()+Math.random(),name:no+"队",heroUid:uid,troops,total,status:"空闲",tile:""};p().teams.push(tm);p().heroes.find(u=>u.uid===uid).assignedTeam=tm.id;log(`创建${tm.name}。`);renderAll()}
 function disbandTeam(id){let tm=p().teams.find(x=>x.id===id);if(!tm)return;if(tm.status==="驻守")return alert("驻守中的队伍不能解散，请先在地图撤回");for(let k in tm.troops)p().troopStock[k]=(p().troopStock[k]||0)+tm.troops[k];let hero=p().heroes.find(u=>u.assignedTeam===id);if(hero)hero.assignedTeam="";p().teams=p().teams.filter(x=>x.id!==id);log(`解散${tm.name}，士兵返还库存。`);renderAll()}
 function teamPower(tm){let hero=p().heroes.find(u=>u.uid===tm.heroUid),ht=hero?h(hero.id):null;let hp=ht?(ht.atk*8+ht.def*7+ht.str*7+ht.spd*4+ht.siege*5+hero.lv*ht.star*30+hero.skillLv*ht.star*80):0;let tp=0;for(let [k,v] of Object.entries(tm.troops)){let d=troopTypes[k];tp+=v*(d.baseAtk+d.baseDef+d.baseSpeed)/5}return Math.floor((hp+tp)*(tm.status==="驻守"?1.05:1))}
 function renderBattle(){document.getElementById("page-battle").innerHTML=`<h2>战斗页 / 战报</h2><p class="muted">大地图派军队进攻、占领、遭遇入侵军后会在这里生成战报。</p><div class="list">${p().reports.map(r=>`<div class="item"><h3>${r.title}｜${r.result}</h3><p>时间：${r.time}</p><p>我方战力：${r.atk}｜敌方战力：${r.def}｜损失：${r.loss}</p><p class="muted">${r.detail}</p></div>`).join("")||"<div class='item muted'>暂无战报。</div>"}</div>`}
 
-function renderHeroes(){document.getElementById("page-heroes").innerHTML=`<h2>武将</h2><div class="list">${p().heroes.map(u=>{let t=h(u.id);return `<div class="item"><b class="star${t.star}">${"★".repeat(t.star)} ${t.name}</b>${t.tag?`<span class="tag">${t.tag}</span>`:""}<p class="muted">Lv.${u.lv}｜${t.type}｜${t.skill}</p><p>归属：${u.assignedTeam?teamName(u.assignedTeam):"未编队"}</p><button onclick="lvHero('${u.uid}')">升级</button> <button onclick="skillHero('${u.uid}')">升战法</button></div>`}).join("")}</div><hr class="hr"><h2>图鉴</h2><div class="grid two">${heroes.map(t=>`<div class="stat"><h3 class="star${t.star}">${"★".repeat(t.star)} ${t.name}${t.tag?`<span class="tag">${t.tag}</span>`:""}</h3><p class="muted">${t.type}｜武${t.atk} 防${t.def} 谋${t.str} 速${t.spd} 攻${t.siege}</p><p class="muted">${t.skill}</p></div>`).join("")}</div>`}
+function heroScore(u){
+ let t=h(u.id);
+ return t.atk*8+t.def*7+t.str*7+t.spd*4+t.siege*5+u.lv*t.star*30+u.skillLv*t.star*80;
+}
+
+function heroCompare(a,b){
+ let ha=h(a.id),hb=h(b.id);
+
+ if(heroSortMode==="star")return hb.star-ha.star||heroScore(b)-heroScore(a)||a.uid.localeCompare(b.uid);
+ if(heroSortMode==="level")return b.lv-a.lv||hb.star-ha.star||heroScore(b)-heroScore(a);
+ if(heroSortMode==="power")return heroScore(b)-heroScore(a)||hb.star-ha.star;
+ if(heroSortMode==="type")return ha.type.localeCompare(hb.type)||hb.star-ha.star;
+ if(heroSortMode==="name")return ha.name.localeCompare(hb.name)||hb.star-ha.star;
+
+ return hb.star-ha.star;
+}
+
+function heroVisibleList(){
+ let list=[...p().heroes];
+
+ if(heroFilterStar!=="all"){
+  list=list.filter(u=>h(u.id).star===Number(heroFilterStar));
+ }
+
+ if(heroFilterType!=="all"){
+  list=list.filter(u=>h(u.id).type===heroFilterType);
+ }
+
+ if(heroFilterStatus==="free"){
+  list=list.filter(u=>!u.assignedTeam);
+ }
+
+ if(heroFilterStatus==="assigned"){
+  list=list.filter(u=>!!u.assignedTeam);
+ }
+
+ list.sort(heroCompare);
+
+ return list;
+}
+
+function setHeroFilters(){
+ heroFilterStar=document.getElementById("heroFilterStar")?.value||"all";
+ heroFilterType=document.getElementById("heroFilterType")?.value||"all";
+ heroFilterStatus=document.getElementById("heroFilterStatus")?.value||"all";
+ heroSortMode=document.getElementById("heroSortMode")?.value||"star";
+ renderHeroes();
+}
+
+function sortHeroesNow(){
+ p().heroes.sort(heroCompare);
+ log("已整理武将列表。");
+ renderAll();
+}
+
+function resetHeroFilters(){
+ heroFilterStar="all";
+ heroFilterType="all";
+ heroFilterStatus="all";
+ heroSortMode="star";
+ renderHeroes();
+}
+
+function renderHeroes(){
+ let types=[...new Set(heroes.map(x=>x.type))];
+ let visible=heroVisibleList();
+
+ document.getElementById("page-heroes").innerHTML=`<h2>武将</h2>
+
+ <div class="stat">
+  <h3>整理 / 筛选</h3>
+  <div class="grid three">
+   <div class="field">
+    <label>星级筛选</label>
+    <select id="heroFilterStar" onchange="setHeroFilters()">
+     <option value="all" ${heroFilterStar==="all"?"selected":""}>全部星级</option>
+     <option value="3" ${heroFilterStar==="3"?"selected":""}>3星</option>
+     <option value="4" ${heroFilterStar==="4"?"selected":""}>4星</option>
+     <option value="5" ${heroFilterStar==="5"?"selected":""}>5星</option>
+     <option value="6" ${heroFilterStar==="6"?"selected":""}>6星</option>
+     <option value="7" ${heroFilterStar==="7"?"selected":""}>7星</option>
+    </select>
+   </div>
+
+   <div class="field">
+    <label>兵种筛选</label>
+    <select id="heroFilterType" onchange="setHeroFilters()">
+     <option value="all" ${heroFilterType==="all"?"selected":""}>全部兵种</option>
+     ${types.map(type=>`<option value="${type}" ${heroFilterType===type?"selected":""}>${type}</option>`).join("")}
+    </select>
+   </div>
+
+   <div class="field">
+    <label>状态筛选</label>
+    <select id="heroFilterStatus" onchange="setHeroFilters()">
+     <option value="all" ${heroFilterStatus==="all"?"selected":""}>全部状态</option>
+     <option value="free" ${heroFilterStatus==="free"?"selected":""}>未编队</option>
+     <option value="assigned" ${heroFilterStatus==="assigned"?"selected":""}>已编队</option>
+    </select>
+   </div>
+  </div>
+
+  <div class="row">
+   <select id="heroSortMode" onchange="setHeroFilters()" style="max-width:220px">
+    <option value="star" ${heroSortMode==="star"?"selected":""}>按星级整理</option>
+    <option value="level" ${heroSortMode==="level"?"selected":""}>按等级整理</option>
+    <option value="power" ${heroSortMode==="power"?"selected":""}>按战力整理</option>
+    <option value="type" ${heroSortMode==="type"?"selected":""}>按兵种整理</option>
+    <option value="name" ${heroSortMode==="name"?"selected":""}>按名字整理</option>
+   </select>
+   <button onclick="sortHeroesNow()">整理背包顺序</button>
+   <button onclick="resetHeroFilters()">重置筛选</button>
+   <span class="muted">当前显示 ${visible.length} / ${p().heroes.length} 名武将</span>
+  </div>
+ </div>
+
+ <br>
+
+ <div class="list">
+  ${visible.map(u=>{
+   let t=h(u.id);
+   return `<div class="item">
+    <b class="star${t.star}">${"★".repeat(t.star)} ${t.name}</b>${t.tag?`<span class="tag">${t.tag}</span>`:""}
+    <p class="muted">Lv.${u.lv}｜战力 ${heroScore(u)}｜${t.type}｜${t.skill}</p>
+    <p>归属：${u.assignedTeam?teamName(u.assignedTeam):"未编队"}</p>
+    <button onclick="lvHero('${u.uid}')">升级</button>
+    <button onclick="skillHero('${u.uid}')">升战法</button>
+   </div>`;
+  }).join("")||"<div class='item muted'>没有符合筛选条件的武将。</div>"}
+ </div>
+
+ <hr class="hr">
+
+ <h2>图鉴</h2>
+ <div class="grid two">
+  ${heroes.map(t=>`<div class="stat">
+   <h3 class="star${t.star}">${"★".repeat(t.star)} ${t.name}${t.tag?`<span class="tag">${t.tag}</span>`:""}</h3>
+   <p class="muted">${t.type}｜武${t.atk} 防${t.def} 谋${t.str} 速${t.spd} 攻${t.siege}</p>
+   <p class="muted">${t.skill}</p>
+  </div>`).join("")}
+ </div>`;
+}
 function lvHero(uid){let u=p().heroes.find(x=>x.uid==uid);if(!spend({铜钱:u.lv*300}))return;u.lv++;log(`${h(u.id).name}升级。`);renderAll()}
 function skillHero(uid){let u=p().heroes.find(x=>x.uid==uid);if(!spend({战法残卷:u.skillLv*50}))return;u.skillLv++;log(`${h(u.id).name}战法升级。`);renderAll()}
 
@@ -709,7 +1063,10 @@ function renderFarm(){
    <hr class="hr">
 
    <h3>选择种子</h3>
-   <select id="seedSel">${seedOptions}</select>
+<select id="seedSel">${seedOptions}</select>
+<br><br>
+<button onclick="plantAll()">一键种植</button>
+<button onclick="harvestAll()">一键收获</button>
   </div>
  </div>
 
@@ -783,6 +1140,79 @@ function clickPlot(id){
  renderAll();
 }
 
+function plantAll(){
+ ensurePlots();
+
+ let selectedSeedName=document.getElementById("seedSel")?.value;
+ let seed=allSeeds().find(x=>x.name===selectedSeedName);
+
+ if(!seed)return alert("请选择种子");
+
+ if(p().farm.exp<seed.lv)return alert("种地经验不足");
+
+ let emptyPlots=p().farm.plots.filter(pl=>pl.unlocked&&!pl.crop);
+
+ if(!emptyPlots.length)return alert("没有空地可以种植");
+
+ let planted=0;
+
+ for(let pl of emptyPlots){
+  if(seed.special){
+   if((p().seedBag[seed.name]||0)<1)break;
+   p().seedBag[seed.name]--;
+  }else{
+   if((p().res.铜钱||0)<seed.price)break;
+   p().res.铜钱-=seed.price;
+  }
+
+  pl.crop=seed.name;
+  pl.mature=now()+seed.min*60000;
+  planted++;
+ }
+
+ if(planted<=0){
+  return alert(seed.special?"特殊种子库存不足":"铜钱不足");
+ }
+
+ log(`一键种植${seed.name}×${planted}。`);
+
+ renderAll();
+}
+
+function harvestAll(){
+ ensurePlots();
+
+ let harvested=0;
+ let gains={};
+
+ for(let pl of p().farm.plots){
+  if(pl.unlocked&&pl.crop&&now()>=pl.mature){
+   let amt=2+Math.floor(Math.random()*4);
+
+   if(specialSeeds.some(s=>s.name===pl.crop)){
+    amt+=3;
+   }
+
+   gains[pl.crop]=(gains[pl.crop]||0)+amt;
+
+   pl.crop="";
+   pl.mature=0;
+   harvested++;
+  }
+ }
+
+ if(harvested<=0)return alert("没有成熟作物");
+
+ for(let k in gains){
+  p().ingredients[k]=(p().ingredients[k]||0)+gains[k];
+ }
+
+ p().farm.exp+=harvested*5;
+
+ log(`一键收获 ${harvested} 块农田，获得：${costText(gains)}，种地经验+${harvested*5}。`);
+
+ renderAll();
+}
 function updateFarmTimers(){
  document.querySelectorAll(".farm-timer").forEach(el=>{
   let mature=Number(el.dataset.mature||0);
@@ -799,25 +1229,25 @@ function updateFarmTimers(){
 
 function marketPrice(name){
  const map={
-  小麦:60,
-  稻米:60,
-  白菜:55,
-  土豆:120,
-  萝卜:120,
-  玉米:140,
-  灵芝:360,
-  雪莲:380,
-  火椒:420,
-  龙牙米:900,
-  赤霞果:950,
-  玄霜菇:1000,
-  金穗麦:500,
-  玄晶稻:800,
-  龙血灵芝:1600,
-  天山雪莲:2400
+  小麦:120,
+  稻米:120,
+  白菜:110,
+  土豆:240,
+  萝卜:240,
+  玉米:280,
+  灵芝:720,
+  雪莲:760,
+  火椒:840,
+  龙牙米:1800,
+  赤霞果:1900,
+  玄霜菇:2000,
+  金穗麦:1000,
+  玄晶稻:1600,
+  龙血灵芝:3200,
+  天山雪莲:4800
  };
 
- return map[name]||80;
+ return map[name]||160;
 }
 
 function refreshMarket(force=false){
