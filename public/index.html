@@ -410,6 +410,17 @@ function gainReward(reward){
 }
 let lastAnnouncementId=0;
 
+function sendWorldBanner(text){
+ if(!acc||!pwdCache||!text)return;
+
+ fetch("/api/broadcast",{
+  method:"POST",
+  headers:{"Content-Type":"application/json"},
+  body:JSON.stringify({acc,pwd:pwdCache,text})
+ }).then(()=>{
+  fetchAnnouncement();
+ }).catch(()=>{});
+}
 function fetchAnnouncement(){
  fetch("/api/announcement/current")
   .then(r=>r.json())
@@ -1272,7 +1283,8 @@ function startDungeon(id){
   id,
   step:0,
   score:0,
-  choices:[]
+  choices:[],
+  lastEvent:""
  };
 
  log(`进入副本：${d.title}`);
@@ -1307,6 +1319,12 @@ function renderDungeonRun(){
   <hr class="hr">
   <h3>请选择</h3>
   ${scene.choices.map((c,i)=>`<button class="dungeon-choice" onclick="chooseDungeonOption(${i})">${i+1}. ${c[0]}</button>`).join("")}
+
+ ${run.lastEvent?`<div class="dungeon-ending">
+  <h3>刚才发生了什么</h3>
+  <p>${run.lastEvent}</p>
+ </div>`:""}
+
   <hr class="hr">
   <button onclick="giveUpDungeon()">放弃本次副本</button>
  </div>`;
@@ -1325,14 +1343,16 @@ function chooseDungeonOption(index){
  if(!choice)return alert("选项不存在");
 
  run.score+=choice[1];
- run.choices.push({
-  step:run.step,
-  text:choice[0],
-  score:choice[1],
-  result:choice[2]
- });
+run.lastEvent=choice[2];
 
- run.step++;
+run.choices.push({
+ step:run.step,
+ text:choice[0],
+ score:choice[1],
+ result:choice[2]
+});
+
+run.step++;
 
  log(`副本选择：${choice[0]}。${choice[2]}`);
 
@@ -1375,6 +1395,9 @@ function finishDungeon(){
  let fixedScore=Math.max(0,run.score);
  let ratio=Math.min(1,fixedScore/maxScore);
  let reward=d.rewardMin+Math.floor((d.rewardMax-d.rewardMin)*ratio);
+if(run.score>=18){
+ sendWorldBanner(`副本传说！${p().name} 完美通关《${d.title}》，南黎的离谱故事再添神话！`);
+}
 
  rewardToMail(
   "副本通关奖励："+d.title,
@@ -1508,7 +1531,34 @@ function renderHeroes(){
 function lvHero(uid){let u=p().heroes.find(x=>x.uid==uid);if(!spend({铜钱:u.lv*300}))return;u.lv++;log(`${h(u.id).name}升级。`);renderAll()}
 function skillHero(uid){let u=p().heroes.find(x=>x.uid==uid);if(!spend({战法残卷:u.skillLv*50}))return;u.skillLv++;log(`${h(u.id).name}战法升级。`);renderAll()}
 
-function addHero(id,source){let t=h(id);if(p().heroes.some(u=>u.id===id)){p().frags[id]=(p().frags[id]||0)+10;log(`重复获得${t.name}，转碎片×10。`)}else{p().heroes.push(inst(id));log(`获得武将：${t.name}${t.tag?"（"+t.tag+"）":""}`)}p().recruitLogs.unshift({time:new Date().toLocaleString(),source,result:t.name+(t.tag?"（"+t.tag+"）":"")});p().recruitLogs=p().recruitLogs.slice(0,60)}
+function addHero(id,source){
+ let t=h(id);
+ let isNew=!p().heroes.some(u=>u.id===id);
+
+ if(isNew){
+  p().heroes.push(inst(id));
+  log(`获得武将：${t.name}${t.tag?"（"+t.tag+"）":""}`);
+
+  if(t.star>=6){
+   sendWorldBanner(`天降名将！${p().name} 通过【${source}】获得 ${t.star}星武将 ${t.name}${t.tag?"（"+t.tag+"）":""}！`);
+  }
+ }else{
+  p().frags[id]=(p().frags[id]||0)+10;
+  log(`重复获得${t.name}，转碎片×10。`);
+
+  if(t.star>=6){
+   sendWorldBanner(`名将再临！${p().name} 通过【${source}】再次获得 ${t.star}星武将 ${t.name}，转化为碎片×10！`);
+  }
+ }
+
+ p().recruitLogs.unshift({
+  time:new Date().toLocaleString(),
+  source,
+  result:t.name+(t.tag?"（"+t.tag+"）":"")
+ });
+
+ p().recruitLogs=p().recruitLogs.slice(0,60);
+}
 function addFrag(id,num,source){let t=h(id);p().frags[id]=(p().frags[id]||0)+num;p().recruitLogs.unshift({time:new Date().toLocaleString(),source,result:`${t.name}碎片×${num}`});p().recruitLogs=p().recruitLogs.slice(0,60);log(`获得${t.name}碎片×${num}。`)}
 function renderRecruit(){document.getElementById("page-recruit").innerHTML=`<h2>招募</h2><div class="grid two"><div class="stat"><h3>常驻招募</h3><p class="muted">只出普通武将，不会出现异世限定武将。最高 5 星。</p><p>消耗：招募令×1</p><button onclick="drawNormal()">招募一次</button></div><div class="stat"><h3>限定招募：异世武将</h3><p class="muted">本赛季限定池，只出现异世武将。异世武将不进入常驻池。</p><p>消耗：限定招募令×1 或绑定元宝×180</p><button onclick="drawLimited(false)">用限定令</button> <button onclick="drawLimited(true)">用元宝</button></div></div><hr class="hr"><h2>招募记录</h2><div class="list">${p().recruitLogs.map(x=>`<div class="item"><b>${x.source}</b><p>${x.result}</p><p class="muted">${x.time}</p></div>`).join("")||"<div class='item muted'>暂无招募记录。</div>"}</div>`}
 function drawNormal(){if(!spend({招募令:1}))return;let pool=heroes.filter(x=>!x.tag&&x.star<=5);let r=Math.random(),s=r<.04?5:r<.22?4:3;addHero(pick(pool.filter(x=>x.star===s)).id,"常驻招募");renderAll()}

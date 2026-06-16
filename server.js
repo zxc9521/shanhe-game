@@ -664,6 +664,27 @@ app.get("/api/chat/list", (req, res) => {
   });
 });
 
+app.post("/api/broadcast", (req, res) => {
+  const { acc, pwd, text } = req.body || {};
+  const finalText = String(text || "").trim().slice(0, 160);
+
+  if (!finalText) return sendError(res, "广播内容不能为空");
+
+  verifyUser(acc, pwd, (err, user, message) => {
+    if (err) return sendError(res, "数据库错误");
+    if (!user) return sendError(res, message);
+    if (user.banned) return sendError(res, "账号已被封禁");
+
+    db.run(
+      "INSERT INTO announcements(text, active, created_at) VALUES(?, 1, ?)",
+      [finalText, Date.now()],
+      insertErr => {
+        if (insertErr) return sendError(res, "发送广播失败");
+        sendOk(res);
+      }
+    );
+  });
+});
 app.get("/api/announcement/current", (req, res) => {
   db.get(
     `
