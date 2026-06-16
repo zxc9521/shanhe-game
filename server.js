@@ -823,7 +823,7 @@ app.post("/api/gm/mute", requireGm, (req, res) => {
 });
 
 app.post("/api/gm/announcement", requireGm, (req, res) => {
-  const text = String(req.body?.text || "").trim().slice(0, 160);
+  const text = String((req.body && req.body.text) || "").trim().slice(0, 160);
 
   if (!text) return sendError(res, "公告内容不能为空");
 
