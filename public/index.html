@@ -28,6 +28,8 @@ h2,h3{color:var(--gold);margin:0 0 12px}.grid{display:grid;gap:12px}.two{grid-te
 .table{width:100%;border-collapse:collapse;font-size:13px}.table th,.table td{border:1px solid var(--line);padding:8px;text-align:left}.table th{color:var(--gold);background:#1b120c}
 .event-layout{display:grid;grid-template-columns:210px 1fr;gap:14px}.event-tabs{max-height:650px;overflow:auto;background:rgba(20,14,9,.8);border:1px solid var(--line);border-radius:14px;padding:10px}.event-tabs button{width:100%;margin-bottom:8px;text-align:left}.event-tabs button.active{background:linear-gradient(#b1782f,#724219)}
 .mail-badge{display:inline-block;margin-left:6px;padding:2px 6px;border-radius:999px;background:#b13b32;color:#fff;font-size:12px}
+.announce{display:none;background:linear-gradient(90deg,#5b1d16,#8b5a24,#5b1d16);border-bottom:1px solid var(--gold);color:#fff3c4;padding:8px 16px;text-align:center;font-weight:700}
+.announce.show{display:block}
 .chat-tabs{display:flex;gap:8px;flex-wrap:wrap;margin-bottom:10px}
 .chat-tabs button.active{background:linear-gradient(#b1782f,#724219)}
 .chat-box{height:420px;overflow:auto;background:#100b07;border:1px solid var(--line);border-radius:10px;padding:10px;font-size:13px;line-height:1.7}
@@ -62,6 +64,7 @@ h2,h3{color:var(--gold);margin:0 0 12px}.grid{display:grid;gap:12px}.two{grid-te
 </section>
 
 <section id="game" class="game hidden">
+<div id="announcementBar" class="announce"></div>
 <header>
   <div><div class="brand">山河余烬</div><div id="pinfo" class="muted"></div></div>
   <div id="resbar" class="resbar"></div>
@@ -270,6 +273,7 @@ function enter(){
  game.classList.remove("hidden");
  migratePlayer();
  tickFarm();
+fetchAnnouncement();
 collectProduction(true);
  mapCenter=p().center||{x:150,y:150};
  worldSize=p().worldSize||300;
@@ -319,6 +323,26 @@ function gainReward(reward){
  if(reward.res)gainRes(reward.res);
  if(reward.frags)for(let id in reward.frags)p().frags[id]=(p().frags[id]||0)+reward.frags[id];
  if(reward.bag)for(let k in reward.bag)p().bag[k]=(p().bag[k]||0)+reward.bag[k];
+}
+let lastAnnouncementId=0;
+
+function fetchAnnouncement(){
+ fetch("/api/announcement/current")
+  .then(r=>r.json())
+  .then(data=>{
+   const bar=document.getElementById("announcementBar");
+   if(!bar)return;
+
+   if(data.ok&&data.announcement){
+    lastAnnouncementId=data.announcement.id;
+    bar.textContent="公告：" + data.announcement.text;
+    bar.classList.add("show");
+   }else{
+    bar.textContent="";
+    bar.classList.remove("show");
+   }
+  })
+  .catch(()=>{});
 }
 function renderAll(){pinfo.textContent=`用户名：${p().name}｜账号：${p().a}｜未读邮件 ${unreadMailCount()} 封`;renderRes();renderLogs();renderPage()}
 function renderRes(){resbar.innerHTML=Object.entries(p().res).map(([k,v])=>`<span class="res">${k}：${Math.floor(v)}</span>`).join("")}
@@ -1030,6 +1054,27 @@ setInterval(()=>{
   }
  }
 },1000);
+setInterval(()=>{
+ if(acc&&p()){
+  fetchAnnouncement();
+ }
+},5000);
+
+if(acc&&pwdCache){
+ fetch("/api/login",{
+  method:"POST",
+  headers:{"Content-Type":"application/json"},
+  body:JSON.stringify({acc,pwd:pwdCache})
+ }).then(r=>r.json()).then(data=>{
+  if(data.ok){
+   db.users[acc]={name:data.name,a:acc,pwd:pwdCache};
+   db.players[acc]=data.player;
+   enter();
+  }else{
+   logout();
+  }
+ }).catch(()=>logout());
+}
 if(acc&&pwdCache){
  fetch("/api/login",{
   method:"POST",

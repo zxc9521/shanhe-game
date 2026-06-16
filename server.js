@@ -3,10 +3,13 @@ const sqlite3 = require("sqlite3").verbose();
 const path = require("path");
 
 const app = express();
+
 const PORT = 80;
 const WORLD_SIZE = 300;
 const SPAWN_MARGIN = 20;
 const CHAT_COOLDOWN_MS = 3000;
+
+const GM_KEY = process.env.GM_KEY || "shanhe-gm-123456";
 
 app.use(express.json({ limit: "50mb" }));
 app.use(express.static(path.join(__dirname, "public")));
@@ -36,6 +39,34 @@ function pick(arr) {
 
 function sendError(res, message) {
   res.json({ ok: false, message });
+}
+
+function sendOk(res, data = {}) {
+  res.json({ ok: true, ...data });
+}
+
+function requireGm(req, res, next) {
+  const key = req.headers["x-gm-key"] || req.query.gmKey || "";
+  if (key !== GM_KEY) {
+    return res.status(403).json({ ok: false, message: "GM 密钥错误" });
+  }
+  next();
+}
+
+function parsePlayer(row) {
+  try {
+    return JSON.parse(row.player || "{}");
+  } catch (e) {
+    return {};
+  }
+}
+
+function savePlayer(acc, player, callback) {
+  db.run(
+    "UPDATE users SET player = ?, updated_at = ? WHERE acc = ?",
+    [JSON.stringify(player), Date.now(), acc],
+    callback
+  );
 }
 
 function tileLevel(x, y) {
@@ -142,14 +173,23 @@ function verifyUser(acc, pwd, callback) {
       return;
     }
 
-    let player = {};
-    try {
-      player = JSON.parse(row.player);
-    } catch (e) {
-      player = {};
-    }
+    db.get("SELECT * FROM user_flags WHERE acc = ?", [acc], (flagErr, flag) => {
+      if (flagErr) {
+        callback(flagErr, null, "读取账号状态失败");
+        return;
+      }
 
-    callback(null, { ...row, player }, "");
+      const player = parsePlayer(row);
+
+      callback(null, {
+        ...row,
+        player,
+        banned: !!flag?.banned,
+        muted: !!flag?.muted,
+        ban_reason: flag?.ban_reason || "",
+        mute_reason: flag?.mute_reason || ""
+      }, "");
+    });
   });
 }
 
@@ -158,6 +198,47 @@ function cleanChatText(text) {
     .replace(/\s+/g, " ")
     .trim()
     .slice(0, 120);
+}
+
+function formatChatMessage(row) {
+  return {
+    id: row.id,
+    channel: row.channel,
+    fromAcc: row.from_acc,
+    fromName: row.from_name,
+    toAcc: row.to_acc,
+    toName: row.to_name,
+    alliance: row.alliance,
+    text: row.text,
+    createdAt: row.created_at
+  };
+}
+
+function normalizeReward(reward) {
+  const safe = {};
+
+  if (reward && typeof reward === "object") {
+    if (reward.res && typeof reward.res === "object") safe.res = reward.res;
+    if (reward.bag && typeof reward.bag === "object") safe.bag = reward.bag;
+    if (reward.frags && typeof reward.frags === "object") safe.frags = reward.frags;
+  }
+
+  return safe;
+}
+
+function addMailToPlayer(player, title, content, reward) {
+  if (!player.mails) player.mails = [];
+
+  player.mails.unshift({
+    id: "gm_mail_" + Date.now() + "_" + Math.random(),
+    title: String(title || "GM 邮件").slice(0, 40),
+    content: String(content || "请领取附件。").slice(0, 300),
+    reward: normalizeReward(reward),
+    claimed: false,
+    time: new Date().toLocaleString()
+  });
+
+  player.mails = player.mails.slice(0, 200);
 }
 
 db.serialize(() => {
@@ -208,6 +289,26 @@ db.serialize(() => {
     )
   `);
 
+  db.run(`
+    CREATE TABLE IF NOT EXISTS user_flags (
+      acc TEXT PRIMARY KEY,
+      banned INTEGER NOT NULL DEFAULT 0,
+      muted INTEGER NOT NULL DEFAULT 0,
+      ban_reason TEXT NOT NULL DEFAULT '',
+      mute_reason TEXT NOT NULL DEFAULT '',
+      updated_at INTEGER NOT NULL
+    )
+  `);
+
+  db.run(`
+    CREATE TABLE IF NOT EXISTS announcements (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      text TEXT NOT NULL,
+      active INTEGER NOT NULL DEFAULT 1,
+      created_at INTEGER NOT NULL
+    )
+  `);
+
   initWorld();
 });
 
@@ -233,7 +334,7 @@ app.post("/api/register", (req, res) => {
       [acc, name, pwd, JSON.stringify(player), Date.now()],
       err2 => {
         if (err2) return sendError(res, "注册失败");
-        res.json({ ok: true, player, worldSize: WORLD_SIZE });
+        sendOk(res, { player, worldSize: WORLD_SIZE });
       }
     );
   });
@@ -246,20 +347,22 @@ app.post("/api/login", (req, res) => {
     return sendError(res, "账号或密码不能为空");
   }
 
-  db.get("SELECT * FROM users WHERE acc = ?", [acc], (err, row) => {
+  verifyUser(acc, pwd, (err, user, message) => {
     if (err) return sendError(res, "数据库错误");
-    if (!row || row.pwd !== pwd) return sendError(res, "账号或密码错误");
+    if (!user) return sendError(res, message);
+    if (user.banned) return sendError(res, "账号已被封禁：" + (user.ban_reason || "无原因"));
 
-    const player = JSON.parse(row.player);
+    const player = user.player;
     if (!player.center) player.center = randomSpawn();
     if (!player.map) player.map = {};
     player.worldSize = WORLD_SIZE;
 
-    res.json({
-      ok: true,
-      name: row.name,
+    sendOk(res, {
+      name: user.name,
       player,
-      worldSize: WORLD_SIZE
+      worldSize: WORLD_SIZE,
+      muted: user.muted,
+      muteReason: user.mute_reason
     });
   });
 });
@@ -271,21 +374,18 @@ app.post("/api/save", (req, res) => {
     return sendError(res, "保存信息不完整");
   }
 
-  db.get("SELECT * FROM users WHERE acc = ?", [acc], (err, row) => {
+  verifyUser(acc, pwd, (err, user, message) => {
     if (err) return sendError(res, "数据库错误");
-    if (!row || row.pwd !== pwd) return sendError(res, "账号验证失败");
+    if (!user) return sendError(res, message);
+    if (user.banned) return sendError(res, "账号已被封禁");
 
     player.map = {};
     player.worldSize = WORLD_SIZE;
 
-    db.run(
-      "UPDATE users SET player = ?, updated_at = ? WHERE acc = ?",
-      [JSON.stringify(player), Date.now(), acc],
-      err2 => {
-        if (err2) return sendError(res, "保存失败");
-        res.json({ ok: true });
-      }
-    );
+    savePlayer(acc, player, err2 => {
+      if (err2) return sendError(res, "保存失败");
+      sendOk(res);
+    });
   });
 });
 
@@ -315,6 +415,7 @@ app.get("/api/world/tiles", (req, res) => {
       if (err) return sendError(res, "读取世界地图失败");
 
       const tiles = {};
+
       for (const row of rows) {
         tiles[row.id] = {
           id: row.id,
@@ -331,8 +432,7 @@ app.get("/api/world/tiles", (req, res) => {
         };
       }
 
-      res.json({
-        ok: true,
+      sendOk(res, {
         worldSize: WORLD_SIZE,
         tiles
       });
@@ -347,9 +447,10 @@ app.post("/api/world/occupy", (req, res) => {
     return sendError(res, "占领信息不完整");
   }
 
-  db.get("SELECT * FROM users WHERE acc = ?", [acc], (err, row) => {
+  verifyUser(acc, pwd, (err, user, message) => {
     if (err) return sendError(res, "数据库错误");
-    if (!row || row.pwd !== pwd) return sendError(res, "账号验证失败");
+    if (!user) return sendError(res, message);
+    if (user.banned) return sendError(res, "账号已被封禁");
 
     db.run(
       `
@@ -360,7 +461,7 @@ app.post("/api/world/occupy", (req, res) => {
       [owner, garrisonTeam || "", tileId],
       err2 => {
         if (err2) return sendError(res, "更新地块失败");
-        res.json({ ok: true });
+        sendOk(res);
       }
     );
   });
@@ -373,16 +474,17 @@ app.post("/api/world/withdraw", (req, res) => {
     return sendError(res, "撤军信息不完整");
   }
 
-  db.get("SELECT * FROM users WHERE acc = ?", [acc], (err, row) => {
+  verifyUser(acc, pwd, (err, user, message) => {
     if (err) return sendError(res, "数据库错误");
-    if (!row || row.pwd !== pwd) return sendError(res, "账号验证失败");
+    if (!user) return sendError(res, message);
+    if (user.banned) return sendError(res, "账号已被封禁");
 
     db.run(
       "UPDATE world_tiles SET garrisonTeam = '' WHERE id = ?",
       [tileId],
       err2 => {
         if (err2) return sendError(res, "撤军失败");
-        res.json({ ok: true });
+        sendOk(res);
       }
     );
   });
@@ -403,14 +505,16 @@ app.post("/api/chat/send", (req, res) => {
   verifyUser(acc, pwd, (err, user, message) => {
     if (err) return sendError(res, "数据库错误");
     if (!user) return sendError(res, message);
+    if (user.banned) return sendError(res, "账号已被封禁");
+    if (user.muted) return sendError(res, "账号已被禁言：" + (user.mute_reason || "无原因"));
 
-    const now = Date.now();
+    const current = Date.now();
 
     db.get("SELECT last_sent FROM chat_rate WHERE acc = ?", [acc], (rateErr, rateRow) => {
       if (rateErr) return sendError(res, "检查发言频率失败");
 
-      if (rateRow && now - rateRow.last_sent < CHAT_COOLDOWN_MS) {
-        const wait = Math.ceil((CHAT_COOLDOWN_MS - (now - rateRow.last_sent)) / 1000);
+      if (rateRow && current - rateRow.last_sent < CHAT_COOLDOWN_MS) {
+        const wait = Math.ceil((CHAT_COOLDOWN_MS - (current - rateRow.last_sent)) / 1000);
         return sendError(res, `发言太快，请 ${wait} 秒后再试`);
       }
 
@@ -435,7 +539,7 @@ app.post("/api/chat/send", (req, res) => {
             target ? target.name : "",
             alliance,
             finalText,
-            now
+            current
           ],
           function (insertErr) {
             if (insertErr) return sendError(res, "发送失败");
@@ -446,12 +550,11 @@ app.post("/api/chat/send", (req, res) => {
               VALUES(?, ?)
               ON CONFLICT(acc) DO UPDATE SET last_sent = excluded.last_sent
               `,
-              [acc, now],
+              [acc, current],
               rateSaveErr => {
                 if (rateSaveErr) return sendError(res, "更新发言频率失败");
 
-                res.json({
-                  ok: true,
+                sendOk(res, {
                   message: {
                     id: this.lastID,
                     channel,
@@ -461,7 +564,7 @@ app.post("/api/chat/send", (req, res) => {
                     toName: target ? target.name : "",
                     alliance,
                     text: finalText,
-                    createdAt: now
+                    createdAt: current
                   }
                 });
               }
@@ -498,6 +601,7 @@ app.get("/api/chat/list", (req, res) => {
   verifyUser(acc, pwd, (err, user, message) => {
     if (err) return sendError(res, "数据库错误");
     if (!user) return sendError(res, message);
+    if (user.banned) return sendError(res, "账号已被封禁");
 
     if (channel === "world") {
       db.all(
@@ -511,7 +615,7 @@ app.get("/api/chat/list", (req, res) => {
         [afterId],
         (listErr, rows) => {
           if (listErr) return sendError(res, "读取聊天失败");
-          res.json({ ok: true, messages: rows.map(formatChatMessage) });
+          sendOk(res, { messages: rows.map(formatChatMessage) });
         }
       );
       return;
@@ -521,7 +625,7 @@ app.get("/api/chat/list", (req, res) => {
       const alliance = String(user.player.alliance || "");
 
       if (!alliance) {
-        return res.json({ ok: true, messages: [] });
+        return sendOk(res, { messages: [] });
       }
 
       db.all(
@@ -536,7 +640,7 @@ app.get("/api/chat/list", (req, res) => {
         [alliance, afterId],
         (listErr, rows) => {
           if (listErr) return sendError(res, "读取同盟聊天失败");
-          res.json({ ok: true, messages: rows.map(formatChatMessage) });
+          sendOk(res, { messages: rows.map(formatChatMessage) });
         }
       );
       return;
@@ -554,26 +658,197 @@ app.get("/api/chat/list", (req, res) => {
       [afterId, acc, acc],
       (listErr, rows) => {
         if (listErr) return sendError(res, "读取私聊失败");
-        res.json({ ok: true, messages: rows.map(formatChatMessage) });
+        sendOk(res, { messages: rows.map(formatChatMessage) });
       }
     );
   });
 });
 
-function formatChatMessage(row) {
-  return {
-    id: row.id,
-    channel: row.channel,
-    fromAcc: row.from_acc,
-    fromName: row.from_name,
-    toAcc: row.to_acc,
-    toName: row.to_name,
-    alliance: row.alliance,
-    text: row.text,
-    createdAt: row.created_at
-  };
-}
+app.get("/api/announcement/current", (req, res) => {
+  db.get(
+    `
+    SELECT * FROM announcements
+    WHERE active = 1
+    ORDER BY id DESC
+    LIMIT 1
+    `,
+    [],
+    (err, row) => {
+      if (err) return sendError(res, "读取公告失败");
+      sendOk(res, {
+        announcement: row
+          ? {
+              id: row.id,
+              text: row.text,
+              createdAt: row.created_at
+            }
+          : null
+      });
+    }
+  );
+});
+
+app.get("/api/gm/players", requireGm, (req, res) => {
+  db.all(
+    `
+    SELECT u.acc, u.name, u.updated_at,
+           f.banned, f.muted, f.ban_reason, f.mute_reason
+    FROM users u
+    LEFT JOIN user_flags f ON f.acc = u.acc
+    ORDER BY u.updated_at DESC
+    LIMIT 200
+    `,
+    [],
+    (err, rows) => {
+      if (err) return sendError(res, "读取玩家列表失败");
+      sendOk(res, { players: rows });
+    }
+  );
+});
+
+app.get("/api/gm/player/:acc", requireGm, (req, res) => {
+  const acc = req.params.acc;
+
+  db.get(
+    `
+    SELECT u.*, f.banned, f.muted, f.ban_reason, f.mute_reason
+    FROM users u
+    LEFT JOIN user_flags f ON f.acc = u.acc
+    WHERE u.acc = ?
+    `,
+    [acc],
+    (err, row) => {
+      if (err) return sendError(res, "读取玩家失败");
+      if (!row) return sendError(res, "玩家不存在");
+
+      const player = parsePlayer(row);
+
+      sendOk(res, {
+        player: {
+          acc: row.acc,
+          name: row.name,
+          updatedAt: row.updated_at,
+          banned: !!row.banned,
+          muted: !!row.muted,
+          banReason: row.ban_reason || "",
+          muteReason: row.mute_reason || "",
+          alliance: player.alliance || "",
+          res: player.res || {},
+          bag: player.bag || {},
+          mails: player.mails || []
+        }
+      });
+    }
+  );
+});
+
+app.post("/api/gm/mail", requireGm, (req, res) => {
+  const { acc, title, content, reward } = req.body || {};
+
+  if (!acc) return sendError(res, "请输入玩家账号");
+  if (!title) return sendError(res, "请输入邮件标题");
+
+  db.get("SELECT * FROM users WHERE acc = ?", [acc], (err, row) => {
+    if (err) return sendError(res, "数据库错误");
+    if (!row) return sendError(res, "玩家不存在");
+
+    const player = parsePlayer(row);
+
+    addMailToPlayer(
+      player,
+      title,
+      content || "GM 发放奖励，请领取附件。",
+      reward || {}
+    );
+
+    savePlayer(acc, player, err2 => {
+      if (err2) return sendError(res, "发送邮件失败");
+      sendOk(res);
+    });
+  });
+});
+
+app.post("/api/gm/ban", requireGm, (req, res) => {
+  const { acc, banned, reason } = req.body || {};
+
+  if (!acc) return sendError(res, "请输入玩家账号");
+
+  db.get("SELECT acc FROM users WHERE acc = ?", [acc], (err, row) => {
+    if (err) return sendError(res, "数据库错误");
+    if (!row) return sendError(res, "玩家不存在");
+
+    db.run(
+      `
+      INSERT INTO user_flags(acc, banned, muted, ban_reason, mute_reason, updated_at)
+      VALUES(?, ?, 0, ?, '', ?)
+      ON CONFLICT(acc) DO UPDATE SET
+        banned = excluded.banned,
+        ban_reason = excluded.ban_reason,
+        updated_at = excluded.updated_at
+      `,
+      [acc, banned ? 1 : 0, String(reason || ""), Date.now()],
+      err2 => {
+        if (err2) return sendError(res, "操作失败");
+        sendOk(res);
+      }
+    );
+  });
+});
+
+app.post("/api/gm/mute", requireGm, (req, res) => {
+  const { acc, muted, reason } = req.body || {};
+
+  if (!acc) return sendError(res, "请输入玩家账号");
+
+  db.get("SELECT acc FROM users WHERE acc = ?", [acc], (err, row) => {
+    if (err) return sendError(res, "数据库错误");
+    if (!row) return sendError(res, "玩家不存在");
+
+    db.run(
+      `
+      INSERT INTO user_flags(acc, banned, muted, ban_reason, mute_reason, updated_at)
+      VALUES(?, 0, ?, '', ?, ?)
+      ON CONFLICT(acc) DO UPDATE SET
+        muted = excluded.muted,
+        mute_reason = excluded.mute_reason,
+        updated_at = excluded.updated_at
+      `,
+      [acc, muted ? 1 : 0, String(reason || ""), Date.now()],
+      err2 => {
+        if (err2) return sendError(res, "操作失败");
+        sendOk(res);
+      }
+    );
+  });
+});
+
+app.post("/api/gm/announcement", requireGm, (req, res) => {
+  const text = String(req.body?.text || "").trim().slice(0, 160);
+
+  if (!text) return sendError(res, "公告内容不能为空");
+
+  db.serialize(() => {
+    db.run("UPDATE announcements SET active = 0 WHERE active = 1");
+    db.run(
+      "INSERT INTO announcements(text, active, created_at) VALUES(?, 1, ?)",
+      [text, Date.now()],
+      err => {
+        if (err) return sendError(res, "发布公告失败");
+        sendOk(res);
+      }
+    );
+  });
+});
+
+app.post("/api/gm/announcement/clear", requireGm, (req, res) => {
+  db.run("UPDATE announcements SET active = 0 WHERE active = 1", [], err => {
+    if (err) return sendError(res, "清除公告失败");
+    sendOk(res);
+  });
+});
 
 app.listen(PORT, "0.0.0.0", () => {
   console.log("山河余烬服务器已启动：http://0.0.0.0:80");
+  console.log("GM 后台地址：http://服务器IP/gm.html");
+  console.log("默认 GM 密钥：" + GM_KEY);
 });
