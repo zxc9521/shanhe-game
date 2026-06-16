@@ -41,6 +41,7 @@ h2,h3{color:var(--gold);margin:0 0 12px}.grid{display:grid;gap:12px}.two{grid-te
 </style>
 </head>
 <body>
+<audio id="bgm" src="./assets/audio/bgm.mp3" loop></audio>
 <section id="auth" class="auth">
   <div class="authbox">
     <div class="card">
@@ -68,7 +69,10 @@ h2,h3{color:var(--gold);margin:0 0 12px}.grid{display:grid;gap:12px}.two{grid-te
 <header>
   <div><div class="brand">山河余烬</div><div id="pinfo" class="muted"></div></div>
   <div id="resbar" class="resbar"></div>
+  <div class="row">
+  <button id="bgmBtn" onclick="toggleBgm()">音乐：关</button>
   <button onclick="logout()">退出</button>
+</div>
 </header>
 <div class="main">
 <nav>
@@ -104,6 +108,49 @@ h2,h3{color:var(--gold);margin:0 0 12px}.grid{display:grid;gap:12px}.two{grid-te
 </section>
 
 <script>
+let bgmOn=false;
+
+function toggleBgm(){
+ const bgm=document.getElementById("bgm");
+ const btn=document.getElementById("bgmBtn");
+ if(!bgm)return;
+
+ if(bgmOn){
+  bgm.pause();
+  bgmOn=false;
+  if(btn)btn.textContent="音乐：关";
+  localStorage.setItem("shanhe_bgm_on","0");
+  return;
+ }
+
+ bgm.volume=0.45;
+ bgm.play().then(()=>{
+  bgmOn=true;
+  if(btn)btn.textContent="音乐：开";
+  localStorage.setItem("shanhe_bgm_on","1");
+ }).catch(()=>{
+  alert("浏览器限制自动播放，请再点一次音乐按钮");
+ });
+}
+function restoreBgm(){
+ const bgm=document.getElementById("bgm");
+ const btn=document.getElementById("bgmBtn");
+ if(!bgm)return;
+
+ if(localStorage.getItem("shanhe_bgm_on")==="1"){
+  bgm.volume=0.45;
+  bgm.play().then(()=>{
+   bgmOn=true;
+   if(btn)btn.textContent="音乐：开";
+  }).catch(()=>{
+   bgmOn=false;
+   if(btn)btn.textContent="音乐：关";
+  });
+ }else{
+  bgmOn=false;
+  if(btn)btn.textContent="音乐：关";
+ }
+}
 const KEY="shanhe_v5_html_demo";
 let db={users:{},players:{}};
 let acc=localStorage.getItem("shanhe_v5_acc")||"";
@@ -273,8 +320,9 @@ function enter(){
  game.classList.remove("hidden");
  migratePlayer();
  tickFarm();
-fetchAnnouncement();
-collectProduction(true);
+ collectProduction(true);
+ fetchAnnouncement();
+ restoreBgm();
  mapCenter=p().center||{x:150,y:150};
  worldSize=p().worldSize||300;
  loadWorldAround(()=>{renderAll();show(page)});
