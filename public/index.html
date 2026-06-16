@@ -28,6 +28,11 @@ h2,h3{color:var(--gold);margin:0 0 12px}.grid{display:grid;gap:12px}.two{grid-te
 .table{width:100%;border-collapse:collapse;font-size:13px}.table th,.table td{border:1px solid var(--line);padding:8px;text-align:left}.table th{color:var(--gold);background:#1b120c}
 .event-layout{display:grid;grid-template-columns:210px 1fr;gap:14px}.event-tabs{max-height:650px;overflow:auto;background:rgba(20,14,9,.8);border:1px solid var(--line);border-radius:14px;padding:10px}.event-tabs button{width:100%;margin-bottom:8px;text-align:left}.event-tabs button.active{background:linear-gradient(#b1782f,#724219)}
 .mail-badge{display:inline-block;margin-left:6px;padding:2px 6px;border-radius:999px;background:#b13b32;color:#fff;font-size:12px}
+.hero-item{display:grid;grid-template-columns:76px 1fr;gap:12px;align-items:center}
+.hero-avatar{width:76px;height:76px;border-radius:12px;border:1px solid var(--line);object-fit:cover;background:#100b07}
+.hero-info{min-width:0}
+.hero-book-card{display:grid;grid-template-columns:64px 1fr;gap:10px;align-items:center}
+.hero-book-avatar{width:64px;height:64px;border-radius:10px;border:1px solid var(--line);object-fit:cover;background:#100b07}
 .announce{display:none;background:linear-gradient(90deg,#5b1d16,#8b5a24,#5b1d16);border-bottom:1px solid var(--gold);color:#fff3c4;padding:8px 16px;text-align:center;font-weight:700}
 .announce.show{display:block}
 .chat-tabs{display:flex;gap:8px;flex-wrap:wrap;margin-bottom:10px}
@@ -753,6 +758,9 @@ function disbandTeam(id){let tm=p().teams.find(x=>x.id===id);if(!tm)return;if(tm
 function teamPower(tm){let hero=p().heroes.find(u=>u.uid===tm.heroUid),ht=hero?h(hero.id):null;let hp=ht?(ht.atk*8+ht.def*7+ht.str*7+ht.spd*4+ht.siege*5+hero.lv*ht.star*30+hero.skillLv*ht.star*80):0;let tp=0;for(let [k,v] of Object.entries(tm.troops)){let d=troopTypes[k];tp+=v*(d.baseAtk+d.baseDef+d.baseSpeed)/5}return Math.floor((hp+tp)*(tm.status==="驻守"?1.05:1))}
 function renderBattle(){document.getElementById("page-battle").innerHTML=`<h2>战斗页 / 战报</h2><p class="muted">大地图派军队进攻、占领、遭遇入侵军后会在这里生成战报。</p><div class="list">${p().reports.map(r=>`<div class="item"><h3>${r.title}｜${r.result}</h3><p>时间：${r.time}</p><p>我方战力：${r.atk}｜敌方战力：${r.def}｜损失：${r.loss}</p><p class="muted">${r.detail}</p></div>`).join("")||"<div class='item muted'>暂无战报。</div>"}</div>`}
 
+function heroAvatar(name){
+ return `./assets/images/heroes/${encodeURIComponent(name)}.png`;
+}
 function heroScore(u){
  let t=h(u.id);
  return t.atk*8+t.def*7+t.str*7+t.spd*4+t.siege*5+u.lv*t.star*30+u.skillLv*t.star*80;
@@ -873,26 +881,32 @@ function renderHeroes(){
 
  <div class="list">
   ${visible.map(u=>{
-   let t=h(u.id);
-   return `<div class="item">
-    <b class="star${t.star}">${"★".repeat(t.star)} ${t.name}</b>${t.tag?`<span class="tag">${t.tag}</span>`:""}
-    <p class="muted">Lv.${u.lv}｜战力 ${heroScore(u)}｜${t.type}｜${t.skill}</p>
-    <p>归属：${u.assignedTeam?teamName(u.assignedTeam):"未编队"}</p>
-    <button onclick="lvHero('${u.uid}')">升级</button>
-    <button onclick="skillHero('${u.uid}')">升战法</button>
-   </div>`;
-  }).join("")||"<div class='item muted'>没有符合筛选条件的武将。</div>"}
+ let t=h(u.id);
+ return `<div class="item hero-item">
+  <img class="hero-avatar" src="${heroAvatar(t.name)}" onerror="this.src='./assets/images/heroes/default.png'">
+  <div class="hero-info">
+   <b class="star${t.star}">${"★".repeat(t.star)} ${t.name}</b>${t.tag?`<span class="tag">${t.tag}</span>`:""}
+   <p class="muted">Lv.${u.lv}｜战力 ${heroScore(u)}｜${t.type}｜${t.skill}</p>
+   <p>归属：${u.assignedTeam?teamName(u.assignedTeam):"未编队"}</p>
+   <button onclick="lvHero('${u.uid}')">升级</button>
+   <button onclick="skillHero('${u.uid}')">升战法</button>
+  </div>
+ </div>`;
+}).join("")||"<div class='item muted'>没有符合筛选条件的武将。</div>"}
  </div>
 
  <hr class="hr">
 
  <h2>图鉴</h2>
  <div class="grid two">
-  ${heroes.map(t=>`<div class="stat">
-   <h3 class="star${t.star}">${"★".repeat(t.star)} ${t.name}${t.tag?`<span class="tag">${t.tag}</span>`:""}</h3>
-   <p class="muted">${t.type}｜武${t.atk} 防${t.def} 谋${t.str} 速${t.spd} 攻${t.siege}</p>
-   <p class="muted">${t.skill}</p>
-  </div>`).join("")}
+  ${heroes.map(t=>`<div class="stat hero-book-card">
+ <img class="hero-book-avatar" src="${heroAvatar(t.name)}" onerror="this.src='./assets/images/heroes/default.png'">
+ <div>
+  <h3 class="star${t.star}">${"★".repeat(t.star)} ${t.name}${t.tag?`<span class="tag">${t.tag}</span>`:""}</h3>
+  <p class="muted">${t.type}｜武${t.atk} 防${t.def} 谋${t.str} 速${t.spd} 攻${t.siege}</p>
+  <p class="muted">${t.skill}</p>
+ </div>
+</div>`).join("")}
  </div>`;
 }
 function lvHero(uid){let u=p().heroes.find(x=>x.uid==uid);if(!spend({铜钱:u.lv*300}))return;u.lv++;log(`${h(u.id).name}升级。`);renderAll()}
