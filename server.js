@@ -184,10 +184,10 @@ function verifyUser(acc, pwd, callback) {
       callback(null, {
         ...row,
         player,
-        banned: !!flag?.banned,
-        muted: !!flag?.muted,
-        ban_reason: flag?.ban_reason || "",
-        mute_reason: flag?.mute_reason || ""
+        banned: !!(flag && flag.banned),
+muted: !!(flag && flag.muted),
+ban_reason: flag ? flag.ban_reason || "" : "",
+mute_reason: flag ? flag.mute_reason || "" : ""
       }, "");
     });
   });
