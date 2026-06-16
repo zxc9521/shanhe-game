@@ -6,6 +6,7 @@ const app = express();
 const PORT = 80;
 const WORLD_SIZE = 300;
 const SPAWN_MARGIN = 20;
+const CHAT_COOLDOWN_MS = 3000;
 
 app.use(express.json({ limit: "50mb" }));
 app.use(express.static(path.join(__dirname, "public")));
@@ -124,6 +125,41 @@ function randomSpawn() {
   return { x, y };
 }
 
+function verifyUser(acc, pwd, callback) {
+  if (!acc || !pwd) {
+    callback(null, null, "账号或密码不能为空");
+    return;
+  }
+
+  db.get("SELECT * FROM users WHERE acc = ?", [acc], (err, row) => {
+    if (err) {
+      callback(err, null, "数据库错误");
+      return;
+    }
+
+    if (!row || row.pwd !== pwd) {
+      callback(null, null, "账号验证失败");
+      return;
+    }
+
+    let player = {};
+    try {
+      player = JSON.parse(row.player);
+    } catch (e) {
+      player = {};
+    }
+
+    callback(null, { ...row, player }, "");
+  });
+}
+
+function cleanChatText(text) {
+  return String(text || "")
+    .replace(/\s+/g, " ")
+    .trim()
+    .slice(0, 120);
+}
+
 db.serialize(() => {
   db.run(`
     CREATE TABLE IF NOT EXISTS users (
@@ -148,6 +184,27 @@ db.serialize(() => {
       res TEXT NOT NULL,
       guard INTEGER NOT NULL,
       terrain TEXT NOT NULL
+    )
+  `);
+
+  db.run(`
+    CREATE TABLE IF NOT EXISTS chat_messages (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      channel TEXT NOT NULL,
+      from_acc TEXT NOT NULL,
+      from_name TEXT NOT NULL,
+      to_acc TEXT NOT NULL DEFAULT '',
+      to_name TEXT NOT NULL DEFAULT '',
+      alliance TEXT NOT NULL DEFAULT '',
+      text TEXT NOT NULL,
+      created_at INTEGER NOT NULL
+    )
+  `);
+
+  db.run(`
+    CREATE TABLE IF NOT EXISTS chat_rate (
+      acc TEXT PRIMARY KEY,
+      last_sent INTEGER NOT NULL
     )
   `);
 
@@ -330,6 +387,192 @@ app.post("/api/world/withdraw", (req, res) => {
     );
   });
 });
+
+app.post("/api/chat/send", (req, res) => {
+  const { acc, pwd, channel, toAcc, text } = req.body || {};
+  const finalText = cleanChatText(text);
+
+  if (!["world", "alliance", "private"].includes(channel)) {
+    return sendError(res, "聊天频道错误");
+  }
+
+  if (!finalText) {
+    return sendError(res, "不能发送空消息");
+  }
+
+  verifyUser(acc, pwd, (err, user, message) => {
+    if (err) return sendError(res, "数据库错误");
+    if (!user) return sendError(res, message);
+
+    const now = Date.now();
+
+    db.get("SELECT last_sent FROM chat_rate WHERE acc = ?", [acc], (rateErr, rateRow) => {
+      if (rateErr) return sendError(res, "检查发言频率失败");
+
+      if (rateRow && now - rateRow.last_sent < CHAT_COOLDOWN_MS) {
+        const wait = Math.ceil((CHAT_COOLDOWN_MS - (now - rateRow.last_sent)) / 1000);
+        return sendError(res, `发言太快，请 ${wait} 秒后再试`);
+      }
+
+      const sendMessage = target => {
+        const alliance = channel === "alliance" ? String(user.player.alliance || "") : "";
+
+        if (channel === "alliance" && !alliance) {
+          return sendError(res, "你还没有加入同盟");
+        }
+
+        db.run(
+          `
+          INSERT INTO chat_messages(
+            channel, from_acc, from_name, to_acc, to_name, alliance, text, created_at
+          ) VALUES(?,?,?,?,?,?,?,?)
+          `,
+          [
+            channel,
+            acc,
+            user.name,
+            target ? target.acc : "",
+            target ? target.name : "",
+            alliance,
+            finalText,
+            now
+          ],
+          function (insertErr) {
+            if (insertErr) return sendError(res, "发送失败");
+
+            db.run(
+              `
+              INSERT INTO chat_rate(acc, last_sent)
+              VALUES(?, ?)
+              ON CONFLICT(acc) DO UPDATE SET last_sent = excluded.last_sent
+              `,
+              [acc, now],
+              rateSaveErr => {
+                if (rateSaveErr) return sendError(res, "更新发言频率失败");
+
+                res.json({
+                  ok: true,
+                  message: {
+                    id: this.lastID,
+                    channel,
+                    fromAcc: acc,
+                    fromName: user.name,
+                    toAcc: target ? target.acc : "",
+                    toName: target ? target.name : "",
+                    alliance,
+                    text: finalText,
+                    createdAt: now
+                  }
+                });
+              }
+            );
+          }
+        );
+      };
+
+      if (channel === "private") {
+        if (!toAcc) return sendError(res, "请输入私聊对象账号");
+
+        db.get("SELECT acc, name FROM users WHERE acc = ?", [toAcc], (targetErr, target) => {
+          if (targetErr) return sendError(res, "查找私聊对象失败");
+          if (!target) return sendError(res, "私聊对象不存在");
+          sendMessage(target);
+        });
+      } else {
+        sendMessage(null);
+      }
+    });
+  });
+});
+
+app.get("/api/chat/list", (req, res) => {
+  const acc = String(req.query.acc || "");
+  const pwd = String(req.query.pwd || "");
+  const channel = String(req.query.channel || "world");
+  const afterId = Math.max(0, Number(req.query.afterId || 0));
+
+  if (!["world", "alliance", "private"].includes(channel)) {
+    return sendError(res, "聊天频道错误");
+  }
+
+  verifyUser(acc, pwd, (err, user, message) => {
+    if (err) return sendError(res, "数据库错误");
+    if (!user) return sendError(res, message);
+
+    if (channel === "world") {
+      db.all(
+        `
+        SELECT * FROM chat_messages
+        WHERE channel = 'world'
+          AND id > ?
+        ORDER BY id ASC
+        LIMIT 80
+        `,
+        [afterId],
+        (listErr, rows) => {
+          if (listErr) return sendError(res, "读取聊天失败");
+          res.json({ ok: true, messages: rows.map(formatChatMessage) });
+        }
+      );
+      return;
+    }
+
+    if (channel === "alliance") {
+      const alliance = String(user.player.alliance || "");
+
+      if (!alliance) {
+        return res.json({ ok: true, messages: [] });
+      }
+
+      db.all(
+        `
+        SELECT * FROM chat_messages
+        WHERE channel = 'alliance'
+          AND alliance = ?
+          AND id > ?
+        ORDER BY id ASC
+        LIMIT 80
+        `,
+        [alliance, afterId],
+        (listErr, rows) => {
+          if (listErr) return sendError(res, "读取同盟聊天失败");
+          res.json({ ok: true, messages: rows.map(formatChatMessage) });
+        }
+      );
+      return;
+    }
+
+    db.all(
+      `
+      SELECT * FROM chat_messages
+      WHERE channel = 'private'
+        AND id > ?
+        AND (from_acc = ? OR to_acc = ?)
+      ORDER BY id ASC
+      LIMIT 80
+      `,
+      [afterId, acc, acc],
+      (listErr, rows) => {
+        if (listErr) return sendError(res, "读取私聊失败");
+        res.json({ ok: true, messages: rows.map(formatChatMessage) });
+      }
+    );
+  });
+});
+
+function formatChatMessage(row) {
+  return {
+    id: row.id,
+    channel: row.channel,
+    fromAcc: row.from_acc,
+    fromName: row.from_name,
+    toAcc: row.to_acc,
+    toName: row.to_name,
+    alliance: row.alliance,
+    text: row.text,
+    createdAt: row.created_at
+  };
+}
 
 app.listen(PORT, "0.0.0.0", () => {
   console.log("山河余烬服务器已启动：http://0.0.0.0:80");

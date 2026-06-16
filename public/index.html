@@ -28,6 +28,13 @@ h2,h3{color:var(--gold);margin:0 0 12px}.grid{display:grid;gap:12px}.two{grid-te
 .table{width:100%;border-collapse:collapse;font-size:13px}.table th,.table td{border:1px solid var(--line);padding:8px;text-align:left}.table th{color:var(--gold);background:#1b120c}
 .event-layout{display:grid;grid-template-columns:210px 1fr;gap:14px}.event-tabs{max-height:650px;overflow:auto;background:rgba(20,14,9,.8);border:1px solid var(--line);border-radius:14px;padding:10px}.event-tabs button{width:100%;margin-bottom:8px;text-align:left}.event-tabs button.active{background:linear-gradient(#b1782f,#724219)}
 .mail-badge{display:inline-block;margin-left:6px;padding:2px 6px;border-radius:999px;background:#b13b32;color:#fff;font-size:12px}
+.chat-tabs{display:flex;gap:8px;flex-wrap:wrap;margin-bottom:10px}
+.chat-tabs button.active{background:linear-gradient(#b1782f,#724219)}
+.chat-box{height:420px;overflow:auto;background:#100b07;border:1px solid var(--line);border-radius:10px;padding:10px;font-size:13px;line-height:1.7}
+.chat-msg{padding:5px 0;border-bottom:1px solid rgba(255,255,255,.06)}
+.chat-meta{color:var(--mut);font-size:12px}
+.chat-input{display:grid;grid-template-columns:160px 1fr auto;gap:8px;margin-top:10px}
+@media(max-width:1050px){.chat-input{grid-template-columns:1fr}}
 @media(max-width:1050px){.authbox,.main,.two,.three,.event-layout{grid-template-columns:1fr}nav{border-right:0;border-bottom:1px solid var(--line);display:grid;grid-template-columns:repeat(3,1fr);gap:8px}nav button{margin:0;text-align:center}.side{border-left:0;border-top:1px solid var(--line)}header{align-items:flex-start;flex-direction:column}.map{grid-template-columns:repeat(5,64px);grid-auto-rows:64px}.farmgrid{grid-template-columns:repeat(5,60px);grid-auto-rows:60px}}
 </style>
 </head>
@@ -72,8 +79,10 @@ h2,h3{color:var(--gold);margin:0 0 12px}.grid{display:grid;gap:12px}.two{grid-te
   <button onclick="show('events')">限时活动</button>
   <button onclick="show('bag')">背包</button>
   <button onclick="show('farm')">种地</button>
+<button onclick="show('market')">市场</button>
   <button onclick="show('cook')">厨房</button>
   <button onclick="show('alliance')">同盟</button>
+<button onclick="show('chat')">聊天</button>
 </nav>
 <main class="content">
   <section id="page-home"></section><section id="page-map" class="hidden"></section>
@@ -81,7 +90,8 @@ h2,h3{color:var(--gold);margin:0 0 12px}.grid{display:grid;gap:12px}.two{grid-te
   <section id="page-battle" class="hidden"></section><section id="page-heroes" class="hidden"></section>
   <section id="page-recruit" class="hidden"></section><section id="page-events" class="hidden"></section>
   <section id="page-bag" class="hidden"></section><section id="page-farm" class="hidden"></section>
-  <section id="page-cook" class="hidden"></section><section id="page-alliance" class="hidden"></section>
+<section id="page-market" class="hidden"></section><section id="page-cook" class="hidden"></section><section id="page-alliance" class="hidden"></section>
+<section id="page-chat" class="hidden"></section>
 </main>
 <aside class="side">
   <h3>情报面板</h3><div id="side" class="muted">点击地图或功能查看详情。</div>
@@ -96,6 +106,10 @@ let db={users:{},players:{}};
 let acc=localStorage.getItem("shanhe_v5_acc")||"";
 let pwdCache=localStorage.getItem("shanhe_v5_pwd")||"";
 let page="home", selectedTile="", mapCenter={x:150,y:150}, activeEvent="catchup", worldSize=300;
+let activeChat="world", chatTimer=null, chatRendered=false;
+let chatMessages={world:[],alliance:[],private:[]};
+let chatLastId={world:0,alliance:0,private:0};
+let chatSending=false, chatNextSendAt=0;
 const season={totalDays:30,invasionDay:15,invasionName:"玄旌禁军",bossName:"玄旌王朝"};
 
 const heroRaw=[
@@ -125,6 +139,21 @@ const seeds=[
 ["小麦","普通",1,0,20],["稻米","普通",1,0,20],["白菜","普通",1,0,20],["土豆","优良",2,20,60],["萝卜","优良",2,20,60],["玉米","优良",2,25,70],
 ["灵芝","稀有",4,60,160],["雪莲","稀有",4,60,160],["火椒","稀有",4,70,180],["龙牙米","贡品",6,130,400],["赤霞果","贡品",6,140,420],["玄霜菇","贡品",6,150,450]
 ].map(s=>({name:s[0],rarity:s[1],min:s[2],lv:s[3],price:s[4]}));
+const specialSeeds=[
+["金穗麦","特殊",2,0,{铜钱:1200}],
+["玄晶稻","特殊",3,20,{铜钱:2600}],
+["赤霞果","珍稀",5,60,{绑定元宝:80}],
+["龙血灵芝","珍稀",8,120,{绑定元宝:150}],
+["天山雪莲","传说",10,180,{绑定元宝:300}]
+].map(s=>({name:s[0],rarity:s[1],min:s[2],lv:s[3],buy:s[4],special:true}));
+
+function allSeeds(){
+ return [...seeds,...specialSeeds];
+}
+
+function seedBuyText(seed){
+ return seed.buy?costText(seed.buy):`铜钱×${seed.price}`;
+}
 
 const recipes=[
 ["粗粮饼",{小麦:2,稻米:1},"士气恢复 +5%"],["行军饭团",{稻米:2,白菜:1},"行军粮草消耗 -5%"],["辣椒炖肉",{火椒:1,小麦:2},"骑兵首次交战 +6%"],
@@ -211,6 +240,10 @@ async function login(){
 function logout(){
  localStorage.removeItem("shanhe_v5_acc");
  localStorage.removeItem("shanhe_v5_pwd");
+ if(chatTimer){
+  clearInterval(chatTimer);
+  chatTimer=null;
+ }
  acc="";
  pwdCache="";
  auth.classList.remove("hidden");
@@ -222,11 +255,11 @@ function newPlayer(name,a){
  return {
   name,a,createdAt:now(),alliance:"",center:{x:150,y:150},seen:{},map:{},selectedTeam:"",worldSize:300,
   res:{粮草:15000,木材:10000,石料:10000,铁矿:9000,铜钱:8000,兵源:3500,绑定元宝:1800,招募令:8,限定招募令:3,将魂:0,战法残卷:120,赛季功勋:0,强者令:0},
-  buildings:{官府:1,仓库:1,军营:1,厨房:1,招贤馆:1,城墙:1},
+  buildings:{官府:1,仓库:1,军营:1,厨房:1,招贤馆:1,城墙:1,耕地:1,林场:1,采矿场:1},
   heroes:[inst(pick(starter).id),inst(pick(starter).id),inst(pick(starter).id)],
   troopStock:{民兵:100,步兵:100,弓兵:0,枪兵:0,骑兵:0,器械:0},
   teams:[],nextTeamNo:1,reports:[],stats:{enemyWins:0},
-  ingredients:{小麦:3,稻米:3,白菜:2},foods:{},bag:{传说碎片宝箱:0,五星异世自选箱:0},frags:{},
+  ingredients:{小麦:3,稻米:3,白菜:2},foods:{},seedBag:{},market:{lastRefresh:0,stock:[]},lastProduce:now(),betaGift:false,bag:{传说碎片宝箱:0,五星异世自选箱:0,六星异世自选箱:0},frags:{},
   farm:{exp:0,plots:[{id:"2_2",unlocked:true,crop:"",mature:0}]},
   recruitLogs:[],mails:[],claimedTasks:{},logs:["进入第一赛季。玄旌禁军将在赛季中期入侵大地图。"],pity6:0,pity7:0,newbie:false
  }
@@ -237,6 +270,7 @@ function enter(){
  game.classList.remove("hidden");
  migratePlayer();
  tickFarm();
+collectProduction(true);
  mapCenter=p().center||{x:150,y:150};
  worldSize=p().worldSize||300;
  loadWorldAround(()=>{renderAll();show(page)});
@@ -260,7 +294,24 @@ function loadWorldAround(done){
    if(done)done();
   });
 }
-function migratePlayer(){let q=p();if(!q.mails)q.mails=[];if(!q.claimedTasks)q.claimedTasks={};if(!q.stats)q.stats={enemyWins:0};if(!q.bag)q.bag={};if(q.bag.传说碎片宝箱==null)q.bag.传说碎片宝箱=0;if(q.bag.五星异世自选箱==null)q.bag.五星异世自选箱=0;save()}
+function migratePlayer(){
+ let q=p();
+ if(!q.mails)q.mails=[];
+ if(!q.claimedTasks)q.claimedTasks={};
+ if(!q.stats)q.stats={enemyWins:0};
+ if(!q.bag)q.bag={};
+ if(!q.seedBag)q.seedBag={};
+ if(!q.market)q.market={lastRefresh:0,stock:[]};
+ if(!q.lastProduce)q.lastProduce=now();
+ if(q.betaGift==null)q.betaGift=false;
+ if(q.bag.传说碎片宝箱==null)q.bag.传说碎片宝箱=0;
+ if(q.bag.五星异世自选箱==null)q.bag.五星异世自选箱=0;
+ if(q.bag.六星异世自选箱==null)q.bag.六星异世自选箱=0;
+ if(!q.buildings.耕地)q.buildings.耕地=1;
+ if(!q.buildings.林场)q.buildings.林场=1;
+ if(!q.buildings.采矿场)q.buildings.采矿场=1;
+ save();
+}
 function log(t){p().logs.unshift(new Date().toLocaleTimeString()+" - "+t);p().logs=p().logs.slice(0,120);save();renderLogs()}
 function spend(c){for(let k in c)if((p().res[k]||0)<c[k]){alert(k+"不足");return false}for(let k in c)p().res[k]-=c[k];return true}
 function gainRes(r){for(let k in r)p().res[k]=(p().res[k]||0)+r[k]}
@@ -272,8 +323,14 @@ function gainReward(reward){
 function renderAll(){pinfo.textContent=`用户名：${p().name}｜账号：${p().a}｜未读邮件 ${unreadMailCount()} 封`;renderRes();renderLogs();renderPage()}
 function renderRes(){resbar.innerHTML=Object.entries(p().res).map(([k,v])=>`<span class="res">${k}：${Math.floor(v)}</span>`).join("")}
 function renderLogs(){logs.innerHTML=p().logs.map(x=>`<div>${x}</div>`).join("")}
-function show(x){page=x;document.querySelectorAll("main section").forEach(s=>s.classList.add("hidden"));document.getElementById("page-"+x).classList.remove("hidden");renderPage()}
-function renderPage(){({home:renderHome,map:renderMap,barracks:renderBarracks,teams:renderTeams,battle:renderBattle,heroes:renderHeroes,recruit:renderRecruit,events:renderEvents,bag:renderBag,farm:renderFarm,cook:renderCook,alliance:renderAlliance}[page]||renderHome)();renderRes()}
+function show(x){
+ page=x;
+ document.querySelectorAll("main section").forEach(s=>s.classList.add("hidden"));
+ document.getElementById("page-"+x).classList.remove("hidden");
+ renderPage();
+ if(x==="chat")startChatPolling();
+}
+function renderPage(){({home:renderHome,map:renderMap,barracks:renderBarracks,teams:renderTeams,battle:renderBattle,heroes:renderHeroes,recruit:renderRecruit,events:renderEvents,bag:renderBag,farm:renderFarm,market:renderMarket,cook:renderCook,alliance:renderAlliance,chat:renderChat}[page]||renderHome)();renderRes()}
 function costText(c){return Object.entries(c||{}).map(([k,v])=>`${k}×${v}`).join("，")}
 function rewardText(r){let arr=[];if(r.res)arr.push(costText(r.res));if(r.frags)arr.push(Object.entries(r.frags).map(([id,v])=>`${h(Number(id)).name}碎片×${v}`).join("，"));if(r.bag)arr.push(costText(r.bag));return arr.filter(Boolean).join("，")||"无"}
 function rewardToMail(title,reward,content){p().mails.unshift({id:"mail"+now()+Math.random(),title,content:content||"奖励已发放，请领取附件。",reward,claimed:false,time:new Date().toLocaleString()});log(`收到邮件：${title}`);save()}
@@ -281,7 +338,54 @@ function unreadMailCount(){return p().mails.filter(m=>!m.claimed).length}
 function claimMail(id){let m=p().mails.find(x=>x.id===id);if(!m||m.claimed)return;if(m.reward)gainReward(m.reward);m.claimed=true;log(`领取邮件附件：${m.title}`);renderAll()}
 function claimAllMail(){let count=0;for(let m of p().mails){if(!m.claimed){if(m.reward)gainReward(m.reward);m.claimed=true;count++}}log(`一键领取 ${count} 封邮件附件。`);renderAll()}
 
-function buildingData(k,lv){let base={官府:{cost:{木材:700,石料:700,铁矿:300,铜钱:300},gain:"提高主城阶段和资源产出上限。"},仓库:{cost:{木材:500,石料:900,铁矿:200,铜钱:250},gain:"提高仓储上限。"},军营:{cost:{木材:800,石料:500,铁矿:800,铜钱:450},gain:`解锁兵种。当前可征：${unlockedTroops().join("、")}`},厨房:{cost:{木材:450,石料:300,铁矿:200,铜钱:350},gain:"解锁高级军粮。"},招贤馆:{cost:{木材:500,石料:400,铁矿:300,铜钱:800},gain:"提高招募、碎片兑换与武将培养效率。"},城墙:{cost:{木材:450,石料:1000,铁矿:400,铜钱:350},gain:"提高驻守地块与主城防御。"}}[k];let cost={};for(let x in base.cost)cost[x]=base.cost[x]*lv;return {cost,gain:base.gain}}
+function buildingData(k,lv){
+ let base={
+  官府:{cost:{木材:700,石料:700,铁矿:300,铜钱:300},gain:"提高主城阶段和资源产出上限。"},
+  仓库:{cost:{木材:500,石料:900,铁矿:200,铜钱:250},gain:"提高仓储上限。"},
+  军营:{cost:{木材:800,石料:500,铁矿:800,铜钱:450},gain:`解锁兵种。当前可征：${unlockedTroops().join("、")}`},
+  厨房:{cost:{木材:450,石料:300,铁矿:200,铜钱:350},gain:"解锁高级军粮。"},
+  招贤馆:{cost:{木材:500,石料:400,铁矿:300,铜钱:800},gain:"提高招募、碎片兑换与武将培养效率。"},
+  城墙:{cost:{木材:450,石料:1000,铁矿:400,铜钱:350},gain:"提高驻守地块与主城防御。"},
+  耕地:{cost:{木材:600,石料:300,铜钱:500},gain:"每分钟产出粮草。等级越高，粮草越多。"},
+  林场:{cost:{粮草:500,石料:300,铜钱:500},gain:"每分钟产出木材。等级越高，木材越多。"},
+  采矿场:{cost:{粮草:600,木材:500,铜钱:700},gain:"每分钟产出石料和铁矿。等级越高，矿产越多。"}
+ }[k];
+
+ let cost={};
+ for(let x in base.cost)cost[x]=base.cost[x]*lv;
+ return {cost,gain:base.gain};
+}
+function collectProduction(showLog=false){
+ if(!acc||!p())return;
+ let q=p();
+ if(!q.lastProduce)q.lastProduce=now();
+
+ let diff=now()-q.lastProduce;
+ if(diff<60000)return;
+
+ let minutes=Math.min(720,Math.floor(diff/60000));
+ q.lastProduce+=minutes*60000;
+
+ let field=q.buildings.耕地||1;
+ let wood=q.buildings.林场||1;
+ let mine=q.buildings.采矿场||1;
+
+ let reward={
+  粮草:minutes*field*50,
+  木材:minutes*wood*35,
+  石料:minutes*mine*25,
+  铁矿:minutes*mine*25
+ };
+
+ gainRes(reward);
+
+ if(showLog){
+  log(`资源建筑产出：${costText(reward)}`);
+ }else{
+  save();
+  renderRes();
+ }
+}
 function renderHome(){
  let html=`<h2>主页建筑</h2><div class="grid three">`;
  for(let [k,lv] of Object.entries(p().buildings)){let d=buildingData(k,lv);html+=`<div class="stat"><h3>${k} Lv.${lv}</h3><p class="muted">增益：${d.gain}</p><p>升级消耗：${costText(d.cost)}</p><button onclick="upBuild('${k}')">升级</button></div>`}
@@ -376,10 +480,11 @@ function drawLimited(gold){if(gold){if(!spend({绑定元宝:180}))return}else if
 
 function setEvent(id){activeEvent=id;renderEvents()}
 function renderEvents(){
- let tabs=[["catchup","新军追赶"],["buildGrow","建筑成长"],["occupyGrow","占地成长"],["farmGrow","种地成长"],["strong","强者降临"],["legend","传说之路"]];
+ let tabs=[["beta","内测大礼包"],["catchup","新军追赶"],["buildGrow","建筑成长"],["occupyGrow","占地成长"],["farmGrow","种地成长"],["strong","强者降临"],["legend","传说之路"]];
  document.getElementById("page-events").innerHTML=`<h2>限时活动</h2><div class="event-layout"><div class="event-tabs">${tabs.map(t=>`<button class="${activeEvent===t[0]?"active":""}" onclick="setEvent('${t[0]}')">${t[1]}</button>`).join("")}</div><div>${renderEventContent()}</div></div>`;
 }
 function renderEventContent(){
+ if(activeEvent==="beta")return renderBetaGiftEvent();
  if(activeEvent==="catchup")return `<div class="stat"><h3>新军追赶补给</h3><p class="muted">追赶资源只帮助基础发育。奖励会发到邮箱。</p><p>奖励：绑定元宝×800，粮草×8000，木材×5000，石料×5000，铁矿×4000，铜钱×3000，招募令×5</p><button ${p().newbie?"disabled":""} onclick="claimCatchup()">发到邮箱</button></div>`;
  if(activeEvent==="buildGrow")return renderTaskGroup("建筑升级成长奖励","每次建筑阶段突破都给奖励，奖励发到邮箱。",growthTasks.building);
  if(activeEvent==="occupyGrow")return renderTaskGroup("占领地块成长奖励","占地、击败敌军、夺取城池关卡都会给奖励。",growthTasks.occupy);
@@ -427,6 +532,31 @@ function renderLegendEvent(){
  <p class="muted">普通产出：将魂×60、战法残卷×120、铜钱×1000；小概率额外获得绑定元宝×80。</p>
  <button onclick="drawLegend()">绑定元宝×300 抽取</button></div>`;
 }
+function renderBetaGiftEvent(){
+ return `<div class="stat">
+  <h3>内测大礼包</h3>
+  <p class="muted">内测期间每个账号只能领取一次。奖励会先发到邮箱。</p>
+  <p>奖励：绑定元宝×100000，6星异世自选箱×1，招募令×100</p>
+  <button ${p().betaGift?"disabled":""} onclick="claimBetaGift()">${p().betaGift?"已领取":"领取内测大礼包"}</button>
+ </div>`;
+}
+
+function claimBetaGift(){
+ if(p().betaGift)return alert("已经领取过了");
+
+ p().betaGift=true;
+
+ rewardToMail(
+  "内测大礼包",
+  {
+   res:{绑定元宝:100000,招募令:100},
+   bag:{六星异世自选箱:1}
+  },
+  "感谢参与内测，奖励已发放到邮箱。"
+ );
+
+ renderAll();
+}
 function claimGrowthTask(key){let all=[...growthTasks.building,...growthTasks.occupy,...growthTasks.farm],task=all.find(t=>t.key===key);if(!task||p().claimedTasks[key]||!task.check(p()))return;p().claimedTasks[key]=true;rewardToMail("成长奖励："+task.title,task.reward,"你完成了成长目标，奖励已发放到邮箱。");renderAll()}
 function claimCatchup(){if(p().newbie)return;p().newbie=true;rewardToMail("新军追赶补给",{res:{绑定元宝:800,粮草:8000,木材:5000,石料:5000,铁矿:4000,铜钱:3000,招募令:5}},"后来者补给已发放。该奖励用于基础发育追赶。");renderAll()}
 function drawStrong(){if(!spend({绑定元宝:200}))return;p().pity6++;let six=heroes.filter(x=>x.tag==="异世武将"&&x.star===6);if(Math.random()<.025||p().pity6>=50){p().pity6=0;addHero(pick(six).id,"强者降临")}else{let n=10+Math.floor(Math.random()*21);p().res.强者令+=n;addFrag(pick(six).id,1,"强者降临");log(`强者降临获得强者令×${n}。`)}renderAll()}
@@ -437,32 +567,469 @@ function drawLegend(){if(!spend({绑定元宝:300}))return;p().pity7++;let sev=h
 
 function renderBag(){
  let five=heroes.filter(x=>x.tag==="异世武将"&&x.star===5);
+let six=heroes.filter(x=>x.tag==="异世武将"&&x.star===6);
  document.getElementById("page-bag").innerHTML=`<h2>背包</h2><div class="grid two">
  <div class="stat"><h3>传说碎片宝箱</h3><p>数量：${p().bag.传说碎片宝箱||0}</p><p class="muted">可自选山雨或南黎碎片。</p><button onclick="useLegendBox('山雨')">选择山雨碎片</button> <button onclick="useLegendBox('南黎')">选择南黎碎片</button></div>
  <div class="stat"><h3>5星异世自选箱</h3><p>数量：${p().bag.五星异世自选箱||0}</p><p class="muted">使用后直接获得指定5星异世武将；若重复则转为碎片×10。</p><select id="fiveBoxSelect">${five.map(x=>`<option value="${x.id}">${x.name}</option>`).join("")}</select><br><br><button onclick="useFiveBox()">使用自选箱</button></div>
- <div class="stat"><h3>武将碎片</h3><div class="list">${heroes.filter(x=>p().frags[x.id]).map(t=>`<div class="item"><b>${t.name}</b>${t.tag?`<span class="tag">${t.tag}</span>`:""}<p>碎片：${p().frags[t.id]}/80</p><button onclick="compose(${t.id})">合成武将</button></div>`).join("")||"<p class='muted'>暂无碎片。</p>"}</div></div>
+  <div class="stat"><h3>6星异世自选箱</h3><p>数量：${p().bag.六星异世自选箱||0}</p><p class="muted">使用后直接获得指定6星异世武将；若重复则转为碎片×10。</p><select id="sixBoxSelect">${six.map(x=>`<option value="${x.id}">${x.name}</option>`).join("")}</select><br><br><button onclick="useSixBox()">使用6星自选箱</button></div>
+<div class="stat"><h3>武将碎片</h3><div class="list">${heroes.filter(x=>p().frags[x.id]).map(t=>`<div class="item"><b>${t.name}</b>${t.tag?`<span class="tag">${t.tag}</span>`:""}<p>碎片：${p().frags[t.id]}/80</p><button onclick="compose(${t.id})">合成武将</button></div>`).join("")||"<p class='muted'>暂无碎片。</p>"}</div></div>
  </div>`;
 }
 function useLegendBox(name){if((p().bag.传说碎片宝箱||0)<1)return alert("宝箱不足");let t=heroes.find(x=>x.name===name&&x.star===7);p().bag.传说碎片宝箱--;p().frags[t.id]=(p().frags[t.id]||0)+1;log(`使用传说碎片宝箱，选择${name}碎片×1。`);renderAll()}
 function useFiveBox(){if((p().bag.五星异世自选箱||0)<1)return alert("5星异世自选箱不足");let id=Number(fiveBoxSelect.value);p().bag.五星异世自选箱--;addHero(id,"5星异世自选箱");renderAll()}
 function compose(id){if((p().frags[id]||0)<80)return alert("碎片不足");p().frags[id]-=80;addHero(id,"碎片合成");renderAll()}
+function useSixBox(){
+ if((p().bag.六星异世自选箱||0)<1)return alert("6星异世自选箱不足");
 
+ let id=Number(sixBoxSelect.value);
+
+ p().bag.六星异世自选箱--;
+
+ addHero(id,"6星异世自选箱");
+
+ renderAll();
+}
 function ensurePlots(){for(let y=0;y<5;y++)for(let x=0;x<5;x++){let id=x+"_"+y;if(!p().farm.plots.find(z=>z.id===id))p().farm.plots.push({id,unlocked:false,crop:"",mature:0})}}
 function tickFarm(){if(!acc||!p())return;save()}
 function remain(ms){let s=Math.max(0,Math.ceil((ms-now())/1000));let m=Math.floor(s/60);let r=s%60;return `${m}:${String(r).padStart(2,"0")}`}
-function renderFarm(){ensurePlots();let cells="";for(let y=0;y<5;y++)for(let x=0;x<5;x++){let pl=p().farm.plots.find(z=>z.id===x+"_"+y),ready=pl.crop&&now()>=pl.mature;cells+=`<div onclick="clickPlot('${pl.id}')" class="plot ${pl.unlocked?'':'lock'} ${ready?'ready':''}">${pl.unlocked?(pl.crop?`${pl.crop}<br>${ready?"可收获":remain(pl.mature)}`:"空地"):"未拓建"}</div>`}
-let count=p().farm.plots.filter(x=>x.unlocked).length,expandCost={木材:500+count*200,石料:350+count*140};
-document.getElementById("page-farm").innerHTML=`<h2>独立农田 5×5</h2><p class="muted">点击空地播种，点击成熟作物收获。高级种子需要种地经验解锁购买。</p><div class="grid two"><div><div class="farmgrid">${cells}</div></div><div class="stat"><h3>农田信息</h3><p>种地经验：${p().farm.exp}</p><p>已拓建：${count}/25</p><p>下次拓建消耗：${costText(expandCost)}</p><button onclick="expandFarm()">拓建一块地</button><hr class="hr"><h3>种子商店</h3><select id="seedSel">${seeds.map(s=>`<option value="${s.name}">${s.name}｜${s.rarity}｜需经验${s.lv}｜铜钱${s.price}</option>`).join("")}</select></div></div><hr class="hr"><h2>食材库存</h2><div class="row">${Object.entries(p().ingredients).map(([k,v])=>`<span class="pill">${k}：${v}</span>`).join("")}</div>`}
-function expandFarm(){ensurePlots();let locked=p().farm.plots.find(x=>!x.unlocked);if(!locked)return alert("已满 5×5");let count=p().farm.plots.filter(x=>x.unlocked).length,c={木材:500+count*200,石料:350+count*140};if(!spend(c))return;locked.unlocked=true;log(`拓建农田，消耗${costText(c)}。`);renderAll()}
-function clickPlot(id){let pl=p().farm.plots.find(x=>x.id===id);if(!pl.unlocked)return alert("此地未拓建");if(pl.crop&&now()>=pl.mature){let amt=2+Math.floor(Math.random()*4);p().ingredients[pl.crop]=(p().ingredients[pl.crop]||0)+amt;p().farm.exp+=5;log(`收获${pl.crop}×${amt}，种地经验+5。`);pl.crop="";pl.mature=0;renderAll();return}if(pl.crop)return alert("作物还在生长，剩余 "+remain(pl.mature));let s=seeds.find(x=>x.name===seedSel.value);if(p().farm.exp<s.lv)return alert("种地经验不足");if(!spend({铜钱:s.price}))return;pl.crop=s.name;pl.mature=now()+s.min*60000;log(`种下${s.name}，成熟时间${s.min}分钟。`);renderAll()}
+function renderFarm(){
+ ensurePlots();
 
+ let selected=document.getElementById("seedSel")?.value||"";
+ let cells="";
+
+ for(let y=0;y<5;y++)for(let x=0;x<5;x++){
+  let pl=p().farm.plots.find(z=>z.id===x+"_"+y);
+  let ready=pl.crop&&now()>=pl.mature;
+
+  cells+=`<div onclick="clickPlot('${pl.id}')" class="plot ${pl.unlocked?'':'lock'} ${ready?'ready':''}">
+   ${pl.unlocked?(pl.crop?`${pl.crop}<br>${ready?"可收获":`<span class="farm-timer" data-mature="${pl.mature}">${remain(pl.mature)}</span>`}`:"空地"):"未拓建"}
+  </div>`;
+ }
+
+ let count=p().farm.plots.filter(x=>x.unlocked).length;
+ let expandCost={木材:500+count*200,石料:350+count*140};
+
+ let seedOptions=allSeeds().map(s=>{
+  let owned=s.special?(p().seedBag[s.name]||0):"";
+  let label=s.special
+   ? `${s.name}｜${s.rarity}｜库存${owned}｜成熟${s.min}分钟`
+   : `${s.name}｜${s.rarity}｜需经验${s.lv}｜铜钱${s.price}`;
+
+  return `<option value="${s.name}" ${selected===s.name?"selected":""}>${label}</option>`;
+ }).join("");
+
+ document.getElementById("page-farm").innerHTML=`<h2>独立农田 5×5</h2>
+ <p class="muted">点击空地播种，点击成熟作物收获。普通种子直接用铜钱播种，特殊种子需要先去市场购买。</p>
+
+ <div class="grid two">
+  <div>
+   <div class="farmgrid">${cells}</div>
+  </div>
+
+  <div class="stat">
+   <h3>农田信息</h3>
+   <p>种地经验：${p().farm.exp}</p>
+   <p>已拓建：${count}/25</p>
+   <p>下次拓建消耗：${costText(expandCost)}</p>
+   <button onclick="expandFarm()">拓建一块地</button>
+
+   <hr class="hr">
+
+   <h3>选择种子</h3>
+   <select id="seedSel">${seedOptions}</select>
+  </div>
+ </div>
+
+ <hr class="hr">
+
+ <h2>食材库存</h2>
+ <div class="row">
+  ${Object.entries(p().ingredients).map(([k,v])=>`<span class="pill">${k}：${v}</span>`).join("")}
+ </div>
+
+ <hr class="hr">
+
+ <h2>特殊种子库存</h2>
+ <div class="row">
+  ${Object.entries(p().seedBag).filter(x=>x[1]>0).map(([k,v])=>`<span class="pill">${k}：${v}</span>`).join("")||"<span class='muted'>暂无特殊种子，去市场购买。</span>"}
+ </div>`;
+}
+function expandFarm(){ensurePlots();let locked=p().farm.plots.find(x=>!x.unlocked);if(!locked)return alert("已满 5×5");let count=p().farm.plots.filter(x=>x.unlocked).length,c={木材:500+count*200,石料:350+count*140};if(!spend(c))return;locked.unlocked=true;log(`拓建农田，消耗${costText(c)}。`);renderAll()}
+function clickPlot(id){
+ let pl=p().farm.plots.find(x=>x.id===id);
+
+ if(!pl.unlocked)return alert("此地未拓建");
+
+ if(pl.crop&&now()>=pl.mature){
+  let amt=2+Math.floor(Math.random()*4);
+
+  if(specialSeeds.some(s=>s.name===pl.crop)){
+   amt+=3;
+  }
+
+  p().ingredients[pl.crop]=(p().ingredients[pl.crop]||0)+amt;
+  p().farm.exp+=5;
+
+  log(`收获${pl.crop}×${amt}，种地经验+5。`);
+
+  pl.crop="";
+  pl.mature=0;
+
+  renderAll();
+  return;
+ }
+
+ if(pl.crop){
+  return alert("作物还在生长，剩余 "+remain(pl.mature));
+ }
+
+ let selectedSeedName=document.getElementById("seedSel")?.value;
+ let s=allSeeds().find(x=>x.name===selectedSeedName);
+
+ if(!s)return alert("请选择种子");
+
+ if(p().farm.exp<s.lv){
+  return alert("种地经验不足");
+ }
+
+ if(s.special){
+  if((p().seedBag[s.name]||0)<1){
+   return alert("特殊种子库存不足，请去市场购买");
+  }
+
+  p().seedBag[s.name]--;
+ }else{
+  if(!spend({铜钱:s.price}))return;
+ }
+
+ pl.crop=s.name;
+ pl.mature=now()+s.min*60000;
+
+ log(`种下${s.name}，成熟时间${s.min}分钟。`);
+
+ renderAll();
+}
+
+function updateFarmTimers(){
+ document.querySelectorAll(".farm-timer").forEach(el=>{
+  let mature=Number(el.dataset.mature||0);
+
+  if(!mature)return;
+
+  el.textContent=remain(mature);
+
+  if(now()>=mature&&page==="farm"){
+   renderFarm();
+  }
+ });
+}
+
+function marketPrice(name){
+ const map={
+  小麦:60,
+  稻米:60,
+  白菜:55,
+  土豆:120,
+  萝卜:120,
+  玉米:140,
+  灵芝:360,
+  雪莲:380,
+  火椒:420,
+  龙牙米:900,
+  赤霞果:950,
+  玄霜菇:1000,
+  金穗麦:500,
+  玄晶稻:800,
+  龙血灵芝:1600,
+  天山雪莲:2400
+ };
+
+ return map[name]||80;
+}
+
+function refreshMarket(force=false){
+ let q=p();
+
+ if(!q.market){
+  q.market={lastRefresh:0,stock:[]};
+ }
+
+ if(!force&&q.market.stock.length&&now()-q.market.lastRefresh<3600000){
+  return;
+ }
+
+ let pool=[...specialSeeds];
+
+ q.market.stock=[];
+
+ for(let i=0;i<4;i++){
+  let s=pick(pool);
+
+  q.market.stock.push({
+   name:s.name,
+   buy:s.buy,
+   rarity:s.rarity,
+   min:s.min,
+   lv:s.lv
+  });
+ }
+
+ q.market.lastRefresh=now();
+
+ save();
+}
+
+function renderMarket(){
+ refreshMarket(false);
+
+ let sellRows=Object.entries(p().ingredients).filter(x=>x[1]>0).map(([k,v])=>{
+  let price=marketPrice(k);
+
+  return `<tr>
+   <td>${k}</td>
+   <td>${v}</td>
+   <td>${price} 铜钱/个</td>
+   <td>
+    <button onclick="sellIngredient('${k}',1)">卖1个</button>
+    <button onclick="sellIngredient('${k}',${v})">全卖</button>
+   </td>
+  </tr>`;
+ }).join("");
+
+ let seedRows=p().market.stock.map((s,i)=>{
+  return `<div class="item">
+   <h3>${s.name}<span class="tag">${s.rarity}</span></h3>
+   <p class="muted">成熟 ${s.min} 分钟｜需要种地经验 ${s.lv}</p>
+   <p>价格：${costText(s.buy)}</p>
+   <button onclick="buyMarketSeed(${i})">购买1颗</button>
+  </div>`;
+ }).join("");
+
+ let left=Math.max(0,Math.ceil((3600000-(now()-p().market.lastRefresh))/60000));
+
+ document.getElementById("page-market").innerHTML=`<h2>市场</h2>
+ <div class="grid two">
+  <div class="stat">
+   <h3>出售作物</h3>
+   <p class="muted">种田收获的作物可以在这里出售换铜钱。</p>
+
+   <table class="table">
+    <tr>
+     <th>作物</th>
+     <th>库存</th>
+     <th>价格</th>
+     <th>操作</th>
+    </tr>
+    ${sellRows||"<tr><td colspan='4'>暂无可出售作物</td></tr>"}
+   </table>
+  </div>
+
+  <div class="stat">
+   <h3>特殊种子商店</h3>
+   <p class="muted">市场约每小时自动刷新，也可以花铜钱手动刷新。</p>
+   <p>距离自动刷新约 ${left} 分钟</p>
+
+   <button onclick="manualRefreshMarket()">铜钱×1000 手动刷新</button>
+
+   <hr class="hr">
+
+   <div class="list">${seedRows}</div>
+  </div>
+ </div>`;
+}
+
+function sellIngredient(name,num){
+ num=Math.min(num,p().ingredients[name]||0);
+
+ if(num<=0)return alert("库存不足");
+
+ let price=marketPrice(name);
+
+ p().ingredients[name]-=num;
+
+ if(p().ingredients[name]<=0){
+  delete p().ingredients[name];
+ }
+
+ gainRes({铜钱:price*num});
+
+ log(`市场出售${name}×${num}，获得铜钱×${price*num}。`);
+
+ renderAll();
+}
+
+function buyMarketSeed(index){
+ let item=p().market.stock[index];
+
+ if(!item)return alert("商品不存在");
+
+ if(!spend(item.buy))return;
+
+ p().seedBag[item.name]=(p().seedBag[item.name]||0)+1;
+
+ log(`市场购买特殊种子：${item.name}×1。`);
+
+ renderAll();
+}
+
+function manualRefreshMarket(){
+ if(!spend({铜钱:1000}))return;
+
+ refreshMarket(true);
+
+ log("手动刷新市场。");
+
+ renderAll();
+}
 function renderCook(){document.getElementById("page-cook").innerHTML=`<h2>厨房</h2><div class="grid two">${recipes.map(r=>`<div class="stat"><h3>${r.name}</h3><p class="muted">材料：${costText(r.cost)}</p><p>${r.effect}</p><button onclick="cook(${r.id})">制作</button></div>`).join("")}</div><hr class="hr"><h2>军粮库存</h2><div class="row">${Object.entries(p().foods).map(([k,v])=>`<span class="pill">${k}：${v}</span>`).join("")||"<span class='muted'>暂无</span>"}</div>`}
 function cook(id){let r=recipes.find(x=>x.id===id);for(let k in r.cost)if((p().ingredients[k]||0)<r.cost[k])return alert(k+"不足");for(let k in r.cost)p().ingredients[k]-=r.cost[k];p().foods[r.name]=(p().foods[r.name]||0)+1;log("制作军粮："+r.name);renderAll()}
 function renderAlliance(){document.getElementById("page-alliance").innerHTML=`<h2>同盟</h2><div class="grid two"><div class="stat"><h3>当前同盟</h3><p>${p().alliance||"未加入"}</p><input id="allyName" placeholder="同盟名"><br><br><button onclick="joinAlly()">创建 / 加入</button></div><div class="stat"><h3>多维贡献</h3><p class="muted">建设、后勤、种地、做菜、运输、侦查、守城、治疗都会给贡献。</p><button onclick="donate()">建设捐献</button></div></div>`}
 function joinAlly(){let v=allyName.value.trim();if(!v)return alert("请输入同盟名");p().alliance=v;log("加入同盟："+v);renderAll()}
 function donate(){if(!p().alliance)return alert("先加入同盟");if(!spend({木材:500,石料:500}))return;gainRes({同盟贡献:100});log("完成同盟建设捐献。");renderAll()}
+function setChatChannel(channel){
+ activeChat=channel;
+ chatRendered=false;
+ renderChat();
+ fetchChatMessages();
+}
 
-setInterval(()=>{if(acc&&db.users[acc]&&page==="farm")renderFarm()},1000);
+function renderChat(){
+ const box=document.getElementById("page-chat");
+ if(!box)return;
+
+ box.innerHTML=`<h2>聊天</h2>
+ <div class="stat">
+  <div class="chat-tabs">
+   <button class="${activeChat==='world'?'active':''}" onclick="setChatChannel('world')">世界</button>
+   <button class="${activeChat==='alliance'?'active':''}" onclick="setChatChannel('alliance')">同盟</button>
+   <button class="${activeChat==='private'?'active':''}" onclick="setChatChannel('private')">私聊</button>
+  </div>
+  <p class="muted">每人每 3 秒可以发言一次。私聊对象填写对方账号，不是用户名。</p>
+  <div id="chatBox" class="chat-box"></div>
+  <div class="chat-input">
+   <input id="chatToAcc" placeholder="私聊对象账号" ${activeChat==='private'?'':'disabled'}>
+   <input id="chatText" maxlength="120" placeholder="输入聊天内容，最多120字">
+   <button onclick="sendChatMessage()">发送</button>
+  </div>
+  <p id="chatStatus" class="muted"></p>
+ </div>`;
+
+ chatRendered=true;
+ renderChatMessages();
+ startChatPolling();
+}
+
+function startChatPolling(){
+ if(chatTimer)return;
+ fetchChatMessages();
+ chatTimer=setInterval(()=>{
+  if(page==="chat")fetchChatMessages();
+ },1000);
+}
+
+function fetchChatMessages(){
+ if(!acc||!pwdCache)return;
+ fetch(`/api/chat/list?acc=${encodeURIComponent(acc)}&pwd=${encodeURIComponent(pwdCache)}&channel=${activeChat}&afterId=${chatLastId[activeChat]||0}`)
+  .then(r=>r.json())
+  .then(data=>{
+   if(!data.ok)return;
+   if(!data.messages||!data.messages.length)return;
+
+   for(let m of data.messages){
+    if(!chatMessages[activeChat].some(x=>x.id===m.id)){
+     chatMessages[activeChat].push(m);
+     chatLastId[activeChat]=Math.max(chatLastId[activeChat]||0,m.id);
+    }
+   }
+
+   chatMessages[activeChat]=chatMessages[activeChat].slice(-120);
+   renderChatMessages();
+  })
+  .catch(()=>{});
+}
+
+function renderChatMessages(){
+ const el=document.getElementById("chatBox");
+ if(!el)return;
+
+ const oldBottom=el.scrollTop+el.clientHeight>=el.scrollHeight-20;
+
+ el.innerHTML=(chatMessages[activeChat]||[]).map(m=>{
+  let time=new Date(m.createdAt).toLocaleTimeString();
+  let title="";
+  if(m.channel==="world")title=`[世界] ${m.fromName}`;
+  else if(m.channel==="alliance")title=`[同盟:${m.alliance}] ${m.fromName}`;
+  else title=`[私聊] ${m.fromName} → ${m.toName}`;
+  return `<div class="chat-msg">
+   <div class="chat-meta">${time} ${title}</div>
+   <div>${escapeHtml(m.text)}</div>
+  </div>`;
+ }).join("")||"<div class='muted'>暂无消息。</div>";
+
+ if(oldBottom)el.scrollTop=el.scrollHeight;
+}
+
+function sendChatMessage(){
+ if(chatSending)return;
+
+ let text=document.getElementById("chatText")?.value.trim()||"";
+ let toAcc=document.getElementById("chatToAcc")?.value.trim()||"";
+ let status=document.getElementById("chatStatus");
+
+ if(!text)return alert("请输入聊天内容");
+ if(activeChat==="private"&&!toAcc)return alert("请输入私聊对象账号");
+
+ let left=Math.ceil((chatNextSendAt-Date.now())/1000);
+ if(left>0)return alert(`发言太快，请 ${left} 秒后再试`);
+
+ chatSending=true;
+ if(status)status.textContent="发送中...";
+
+ fetch("/api/chat/send",{
+  method:"POST",
+  headers:{"Content-Type":"application/json"},
+  body:JSON.stringify({acc,pwd:pwdCache,channel:activeChat,toAcc,text})
+ }).then(r=>r.json()).then(data=>{
+  chatSending=false;
+  if(!data.ok){
+   if(status)status.textContent=data.message||"发送失败";
+   alert(data.message||"发送失败");
+   return;
+  }
+
+  chatNextSendAt=Date.now()+3000;
+  document.getElementById("chatText").value="";
+  if(status)status.textContent="已发送";
+  fetchChatMessages();
+ }).catch(()=>{
+  chatSending=false;
+  if(status)status.textContent="网络错误，发送失败";
+ });
+}
+
+function escapeHtml(s){
+ return String(s||"").replace(/[&<>"']/g,c=>({
+  "&":"&amp;",
+  "<":"&lt;",
+  ">":"&gt;",
+  '"':"&quot;",
+  "'":"&#39;"
+ }[c]));
+}
+setInterval(()=>{
+ if(acc&&p()){
+  collectProduction(false);
+
+  if(page==="farm"){
+   updateFarmTimers();
+  }
+
+  if(page==="market"){
+   renderMarket();
+  }
+ }
+},1000);
 if(acc&&pwdCache){
  fetch("/api/login",{
   method:"POST",
