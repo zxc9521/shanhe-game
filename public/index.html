@@ -95,7 +95,7 @@ const KEY="shanhe_v5_html_demo";
 let db={users:{},players:{}};
 let acc=localStorage.getItem("shanhe_v5_acc")||"";
 let pwdCache=localStorage.getItem("shanhe_v5_pwd")||"";
-let page="home", selectedTile="", mapCenter={x:50,y:50}, activeEvent="catchup";
+let page="home", selectedTile="", mapCenter={x:150,y:150}, activeEvent="catchup", worldSize=300;
 const season={totalDays:30,invasionDay:15,invasionName:"玄旌禁军",bossName:"玄旌王朝"};
 
 const heroRaw=[
@@ -220,7 +220,7 @@ function inst(id){return {uid:"h"+now()+Math.random(),id,lv:1,skillLv:1,assigned
 function newPlayer(name,a){
  const starter=heroes.filter(x=>!x.tag&&x.star<=4);
  return {
-  name,a,createdAt:now(),alliance:"",center:{x:50,y:50},seen:{},map:genMap(),selectedTeam:"",
+  name,a,createdAt:now(),alliance:"",center:{x:150,y:150},seen:{},map:{},selectedTeam:"",worldSize:300,
   res:{粮草:15000,木材:10000,石料:10000,铁矿:9000,铜钱:8000,兵源:3500,绑定元宝:1800,招募令:8,限定招募令:3,将魂:0,战法残卷:120,赛季功勋:0,强者令:0},
   buildings:{官府:1,仓库:1,军营:1,厨房:1,招贤馆:1,城墙:1},
   heroes:[inst(pick(starter).id),inst(pick(starter).id),inst(pick(starter).id)],
@@ -232,7 +232,34 @@ function newPlayer(name,a){
  }
 }
 function genMap(){let types=["resource","resource","fieldTile","salt","horse","mine","battlefield","trade","npc","city","pass"],m={};for(let y=0;y<100;y++)for(let x=0;x<100;x++){let d=Math.abs(x-50)+Math.abs(y-50),type=pick(types);if(x===50&&y===50)type="city";m[x+"_"+y]={x,y,type,lv:Math.max(1,Math.ceil(d/18)),owner:x===50&&y===50?"主城":"",garrisonTeam:"",enemy:x>55&&y>55&&Math.random()<.025,res:pick(["粮草","木材","石料","铁矿","铜钱"]),guard:500+Math.ceil(d/10)*450,terrain:pick(["平原","山地","森林","河流","荒漠","古战场"])}}return m}
-function enter(){auth.classList.add("hidden");game.classList.remove("hidden");migratePlayer();tickFarm();spawnInvasionIfNeeded();mapCenter=p().center;renderAll();show(page)}
+function enter(){
+ auth.classList.add("hidden");
+ game.classList.remove("hidden");
+ migratePlayer();
+ tickFarm();
+ mapCenter=p().center||{x:150,y:150};
+ worldSize=p().worldSize||300;
+ loadWorldAround(()=>{renderAll();show(page)});
+}
+function loadWorldAround(done){
+ if(!acc){
+  if(done)done();
+  return;
+ }
+ fetch(`/api/world/tiles?cx=${mapCenter.x}&cy=${mapCenter.y}&radius=2`)
+  .then(r=>r.json())
+  .then(data=>{
+   if(data.ok){
+    worldSize=data.worldSize||worldSize;
+    p().worldSize=worldSize;
+    p().map={...(p().map||{}),...data.tiles};
+   }
+   if(done)done();
+  })
+  .catch(()=>{
+   if(done)done();
+  });
+}
 function migratePlayer(){let q=p();if(!q.mails)q.mails=[];if(!q.claimedTasks)q.claimedTasks={};if(!q.stats)q.stats={enemyWins:0};if(!q.bag)q.bag={};if(q.bag.传说碎片宝箱==null)q.bag.传说碎片宝箱=0;if(q.bag.五星异世自选箱==null)q.bag.五星异世自选箱=0;save()}
 function log(t){p().logs.unshift(new Date().toLocaleTimeString()+" - "+t);p().logs=p().logs.slice(0,120);save();renderLogs()}
 function spend(c){for(let k in c)if((p().res[k]||0)<c[k]){alert(k+"不足");return false}for(let k in c)p().res[k]-=c[k];return true}
@@ -268,16 +295,58 @@ function seasonDay(){return Math.min(season.totalDays,Math.floor((now()-p().crea
 function daysLeft(){return Math.max(0,season.totalDays-seasonDay()+1)}
 function invasionText(){let d=season.invasionDay-seasonDay();return d>0?`还有 ${d} 天，${season.invasionName}军队入侵`:`${season.invasionName}已经进入大地图，正在与玩家争夺地块`}
 function spawnInvasionIfNeeded(){if(seasonDay()<season.invasionDay||p().invasionSpawned)return;let keys=Object.keys(p().map).filter(k=>p().map[k].type!=="city");for(let i=0;i<24;i++){let t=p().map[pick(keys)];t.enemy=true;t.owner=season.invasionName}p().invasionSpawned=true;log(`${season.invasionName}入侵大地图！部分地块已被敌军占领。`);save()}
-function revealNear(){for(let dy=-2;dy<=2;dy++)for(let dx=-2;dx<=2;dx++){let x=mapCenter.x+dx,y=mapCenter.y+dy;if(x>=0&&y>=0&&x<100&&y<100)p().seen[x+"_"+y]=true}}
-function moveMap(dx,dy){mapCenter.x=Math.max(2,Math.min(97,mapCenter.x+dx));mapCenter.y=Math.max(2,Math.min(97,mapCenter.y+dy));p().center=mapCenter;revealNear();save();renderMap()}
+function revealNear(){
+ for(let dy=-2;dy<=2;dy++)for(let dx=-2;dx<=2;dx++){
+  let x=mapCenter.x+dx,y=mapCenter.y+dy;
+  if(x>=0&&y>=0&&x<worldSize&&y<worldSize)p().seen[x+"_"+y]=true;
+ }
+}
+function moveMap(dx,dy){
+ mapCenter.x=Math.max(2,Math.min(worldSize-3,mapCenter.x+dx));
+ mapCenter.y=Math.max(2,Math.min(worldSize-3,mapCenter.y+dy));
+ p().center=mapCenter;
+ revealNear();
+ save();
+ loadWorldAround(()=>renderMap());
+}
 function tileName(t){return {resource:"资源地",fieldTile:"野外农庄",salt:"盐田",horse:"马场",mine:"灵矿",battlefield:"古战场",trade:"商路节点",npc:"NPC据点",city:"城池",pass:"关卡"}[t]}
 function sym(t){return {resource:"资",fieldTile:"田",salt:"盐",horse:"马",mine:"矿",battlefield:"战",trade:"商",npc:"敌",city:"城",pass:"关"}[t]}
-function renderMap(){spawnInvasionIfNeeded();revealNear();let html="";for(let y=mapCenter.y-2;y<=mapCenter.y+2;y++)for(let x=mapCenter.x-2;x<=mapCenter.x+2;x++){let t=p().map[x+"_"+y];html+=`<div onclick="selTile('${x}_${y}')" class="tile ${t.type} ${t.owner===p().name?'owned':''} ${t.garrisonTeam?'garrison':''} ${t.enemy?'enemy':''} ${x===mapCenter.x&&y===mapCenter.y?'self':''} ${selectedTile===x+'_'+y?'sel':''}"><b>${sym(t.type)}</b><small>${x},${y}</small><small>${t.enemy?'敌军':t.garrisonTeam?'驻守':'Lv.'+t.lv}</small></div>`}
-document.getElementById("page-map").innerHTML=`<h2>大地图 5×5</h2><div class="stat"><b>${invasionText()}</b><p class="muted">赛季剩余 ${daysLeft()} 天。赛季中期后，${season.invasionName} 会进入地图并占领地块。</p></div><br><div class="row"><button onclick="moveMap(0,-1)">上</button><button onclick="moveMap(-1,0)">左</button><button onclick="moveMap(1,0)">右</button><button onclick="moveMap(0,1)">下</button></div><br><div class="mapbox"><div class="map">${html}</div></div>`}
+function renderMap(){revealNear();let html="";for(let y=mapCenter.y-2;y<=mapCenter.y+2;y++)for(let x=mapCenter.x-2;x<=mapCenter.x+2;x++){let t=p().map[x+"_"+y];
+if(!t)continue;html+=`<div onclick="selTile('${x}_${y}')" class="tile ${t.type} ${t.owner===p().name?'owned':''} ${t.garrisonTeam?'garrison':''} ${t.enemy?'enemy':''} ${x===mapCenter.x&&y===mapCenter.y?'self':''} ${selectedTile===x+'_'+y?'sel':''}"><b>${sym(t.type)}</b><small>${x},${y}</small><small>${t.enemy?'敌军':t.garrisonTeam?'驻守':'Lv.'+t.lv}</small></div>`}
+document.getElementById("page-map").innerHTML=`<h2>共享大地图 300×300，当前视野 5×5</h2><div class="stat"><b>${invasionText()}</b><p class="muted">赛季剩余 ${daysLeft()} 天。赛季中期后，${season.invasionName} 会进入地图并占领地块。</p></div><br><div class="row"><button onclick="moveMap(0,-1)">上</button><button onclick="moveMap(-1,0)">左</button><button onclick="moveMap(1,0)">右</button><button onclick="moveMap(0,1)">下</button></div><br><div class="mapbox"><div class="map">${html}</div></div>`}
 function selTile(id){selectedTile=id;let t=p().map[id];side.innerHTML=`<div class="item"><h3>${tileName(t.type)} ${t.x},${t.y}</h3><p>等级：Lv.${t.lv}</p><p>地形：${t.terrain}</p><p>守军：${t.guard}</p><p>归属：${t.owner||"无"}</p><p>驻守：${t.garrisonTeam?teamName(t.garrisonTeam):"无"}</p><p>敌军：${t.enemy?"有":"无"}</p><select id="mapTeam">${p().teams.map(tm=>`<option value="${tm.id}">${tm.name}｜${teamPower(tm)}</option>`).join("")}</select><br><br><button onclick="marchOccupy('${id}')">派军队占领/进攻</button> <button onclick="scout('${id}')">侦查</button> <button onclick="withdrawGarrison('${id}')">撤回驻守</button></div>`;renderMap()}
 function scout(id){let t=p().map[id];if(!spend({粮草:80}))return;log(`侦查：${tileName(t.type)} Lv.${t.lv} 守军约${t.guard} 地形${t.terrain} 归属${t.owner||"无"}`);renderAll()}
-function marchOccupy(id){let team=p().teams.find(x=>x.id===mapTeam.value);if(!team)return alert("请先在军队页编队");let t=p().map[id];if(team.total<50)return alert("该队兵力不足50");if(team.status!=="空闲")return alert("该队不是空闲状态");let wasEnemy=t.enemy||t.owner===season.invasionName;let report=resolveTileBattle(team,t);p().reports.unshift(report);p().reports=p().reports.slice(0,80);if(report.result==="胜利"){if(wasEnemy)p().stats.enemyWins++;t.owner=p().name;t.enemy=false;t.garrisonTeam=team.id;team.status="驻守";team.tile=id;gainRes({赛季功勋:t.lv*10});log(`${team.name}占领并驻守地块 ${t.x},${t.y}`)}else{team.status="空闲";team.tile="";log(`${team.name}进攻失败，生成战报。`)}save();renderAll();selTile(id)}
-function withdrawGarrison(id){let t=p().map[id];if(!t.garrisonTeam)return alert("该地无驻守");let tm=p().teams.find(x=>x.id===t.garrisonTeam);if(tm){tm.status="空闲";tm.tile=""}t.garrisonTeam="";log("撤回驻守军队。");renderAll();selTile(id)}
+function marchOccupy(id){let team=p().teams.find(x=>x.id===mapTeam.value);if(!team)return alert("请先在军队页编队");let t=p().map[id];if(team.total<50)return alert("该队兵力不足50");if(team.status!=="空闲")return alert("该队不是空闲状态");let wasEnemy=t.enemy||t.owner===season.invasionName;let report=resolveTileBattle(team,t);p().reports.unshift(report);p().reports=p().reports.slice(0,80);if(report.result==="胜利"){
+ if(wasEnemy)p().stats.enemyWins++;
+ t.owner=p().name;
+ t.enemy=false;
+ t.garrisonTeam=team.id;
+ team.status="驻守";
+ team.tile=id;
+ gainRes({赛季功勋:t.lv*10});
+ fetch("/api/world/occupy",{
+  method:"POST",
+  headers:{"Content-Type":"application/json"},
+  body:JSON.stringify({acc,pwd:pwdCache,tileId:id,owner:p().name,garrisonTeam:team.id})
+ }).catch(()=>{});
+ log(`${team.name}占领并驻守地块 ${t.x},${t.y}`);
+}
+else{team.status="空闲";team.tile="";log(`${team.name}进攻失败，生成战报。`)}save();renderAll();selTile(id)}
+function withdrawGarrison(id){
+ let t=p().map[id];
+ if(!t.garrisonTeam)return alert("该地无驻守");
+ let tm=p().teams.find(x=>x.id===t.garrisonTeam);
+ if(tm){tm.status="空闲";tm.tile=""}
+ t.garrisonTeam="";
+ fetch("/api/world/withdraw",{
+  method:"POST",
+  headers:{"Content-Type":"application/json"},
+  body:JSON.stringify({acc,pwd:pwdCache,tileId:id})
+ }).catch(()=>{});
+ log("撤回驻守军队。");
+ renderAll();
+ selTile(id);
+}
 function teamName(id){let tm=p().teams.find(x=>x.id===id);return tm?tm.name:"未知"}
 function counterFactor(type,enemyType){if(!enemyType)return 1;return troopTypes[type]?.counter===enemyType?1.18:troopTypes[type]?.weak===enemyType?0.88:1}
 function resolveTileBattle(team,tile){let enemyType=tile.enemy?"骑兵":tile.type==="city"||tile.type==="pass"?"城防":pick(["民兵","步兵","弓兵","枪兵","骑兵"]);let atk=teamPower(team)*counterFactor(mainTroop(team),enemyType)*(0.9+Math.random()*0.2);let def=(tile.guard+(tile.enemy?2500:0))*(tile.garrisonTeam?1.35:1)*(0.9+Math.random()*0.2);let win=atk>=def,loss=Math.ceil(team.total*(win?0.08+Math.random()*0.08:0.18+Math.random()*0.15));applyTeamLoss(team,loss);return {id:"r"+now()+Math.random(),time:new Date().toLocaleString(),title:`${team.name} 进攻 ${tileName(tile.type)} ${tile.x},${tile.y}`,result:win?"胜利":"失败",atk:Math.floor(atk),def:Math.floor(def),loss,enemyType,detail:`兵种克制：我方主力${mainTroop(team)}，敌方${enemyType}。胜利后必须驻守才能保有地块。`}}
