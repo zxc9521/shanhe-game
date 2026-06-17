@@ -61,6 +61,15 @@ h2,h3{color:var(--gold);margin:0 0 12px}.grid{display:grid;gap:12px}.two{grid-te
 .battle-result{font-size:28px;color:var(--gold);text-align:center;margin:8px 0}
 .battle-log{height:230px;overflow:auto;background:#100b07;border:1px solid var(--line);border-radius:12px;padding:10px;font-size:13px;line-height:1.7}
 .battle-log div{border-bottom:1px solid rgba(255,255,255,.06);padding:4px 0}
+.battle-field.art-bg{background-size:cover;background-position:center;background-repeat:no-repeat}
+.battle-effect{position:absolute;left:50%;top:50%;width:150px;height:150px;transform:translate(-50%,-50%);background-size:contain;background-repeat:no-repeat;background-position:center;pointer-events:none;opacity:0}
+.battle-effect.show{animation:battleEffectPop .42s ease-out}
+.battle-effect.slash{background-image:url("./assets/images/battle/effect_slash.png")}
+.battle-effect.arrow{background-image:url("./assets/images/battle/effect_arrow.png")}
+.battle-effect.charge{background-image:url("./assets/images/battle/effect_charge.png")}
+@keyframes battleEffectPop{0%{opacity:0;transform:translate(-50%,-50%) scale(.55) rotate(-12deg)}35%{opacity:1;transform:translate(-50%,-50%) scale(1.15) rotate(3deg)}100%{opacity:0;transform:translate(-50%,-50%) scale(1.45) rotate(12deg)}}
+.battle-actions{display:flex;gap:8px;flex-wrap:wrap;align-items:center}
+.battle-skip{background:linear-gradient(#7d3428,#4d1d17);border-color:#ff9a8e}
 </style>
 </head>
 <body>
@@ -789,6 +798,23 @@ function changeTeamHero(teamId){
 function createTeam(){let uid=teamHero.value;if(!uid)return alert("没有可用武将");let troops={},total=0;for(let k of Object.keys(troopTypes)){let v=Math.floor(Number(document.getElementById("team_"+k).value||0)/50)*50;if(v<0)v=0;if(v>(p().troopStock[k]||0))return alert(k+"库存不足");troops[k]=v;total+=v}if(total<50)return alert("至少选择50兵");for(let k in troops)p().troopStock[k]-=troops[k];let no=p().nextTeamNo++;let tm={id:"team"+now()+Math.random(),name:no+"队",heroUid:uid,troops,total,status:"空闲",tile:""};p().teams.push(tm);p().heroes.find(u=>u.uid===uid).assignedTeam=tm.id;log(`创建${tm.name}。`);renderAll()}
 function disbandTeam(id){let tm=p().teams.find(x=>x.id===id);if(!tm)return;if(tm.status==="驻守")return alert("驻守中的队伍不能解散，请先在地图撤回");for(let k in tm.troops)p().troopStock[k]=(p().troopStock[k]||0)+tm.troops[k];let hero=p().heroes.find(u=>u.assignedTeam===id);if(hero)hero.assignedTeam="";p().teams=p().teams.filter(x=>x.id!==id);log(`解散${tm.name}，士兵返还库存。`);renderAll()}
 function teamPower(tm){let hero=p().heroes.find(u=>u.uid===tm.heroUid),ht=hero?h(hero.id):null;let hp=ht?(ht.atk*8+ht.def*7+ht.str*7+ht.spd*4+ht.siege*5+hero.lv*ht.star*30+hero.skillLv*ht.star*80):0;let tp=0;for(let [k,v] of Object.entries(tm.troops)){let d=troopTypes[k];tp+=v*(d.baseAtk+d.baseDef+d.baseSpeed)/5}return Math.floor((hp+tp)*(tm.status==="驻守"?1.05:1))}
+function battleBgByTerrain(terrain){
+ const map={
+  平原:"bg_plain.jpg",
+  森林:"bg_forest.jpg",
+  山地:"bg_mountain.jpg",
+  河流:"bg_river.jpg",
+  荒漠:"bg_desert.jpg",
+  古战场:"bg_battlefield.jpg"
+ };
+ return `./assets/images/battle/${map[terrain]||"bg_plain.jpg"}`;
+}
+
+function battleEffectByType(type){
+ if(type==="弓兵")return "arrow";
+ if(type==="骑兵")return "charge";
+ return "slash";
+}
 function battleHeroAvatar(team){
  let hero=p().heroes.find(u=>u.uid===team.heroUid);
  if(!hero)return "./assets/images/heroes/default.png";
@@ -863,7 +889,9 @@ function startBattleScene(team,tile,tileId){
   result:"",
   timer:null,
   animPlayer:"",
-  animEnemy:""
+animEnemy:"",
+effect:"",
+effectShow:false
  };
 
  page="battleScene";
@@ -893,8 +921,9 @@ function renderBattleScene(){
  <div class="battle-scene">
   ${b.result?`<div class="battle-result">${b.result}</div>`:""}
 
-  <div class="battle-field">
+  <div class="battle-field art-bg" style="background-image:linear-gradient(rgba(20,12,6,.40),rgba(20,12,6,.82)),url('${battleBgByTerrain(b.tileSnapshot.terrain)}')">
    <div class="battle-vs">VS</div>
+   <div class="battle-effect ${b.effect||""} ${b.effectShow?"show":""}"></div>
 
    <div class="battle-unit player ${b.animPlayer}">
     <img class="battle-avatar" src="${b.player.avatar}" onerror="this.src='./assets/images/heroes/default.png'">
@@ -914,7 +943,10 @@ function renderBattleScene(){
   </div>
 
   <div class="stat">
-   <h3>实时战报</h3>
+   <div class="battle-actions">
+    <h3 style="margin-right:auto">实时战报</h3>
+    <button class="battle-skip" onclick="skipBattleScene()">跳过战斗</button>
+   </div>
    <div id="battleLiveLog" class="battle-log">
     ${b.logs.map(x=>`<div>${x}</div>`).join("")}
    </div>
@@ -950,8 +982,10 @@ function battleNextRound(){
  }
 
  b.animPlayer="attack";
- b.animEnemy="hit";
- renderBattleScene();
+b.animEnemy="hit";
+b.effect=battleEffectByType(b.player.type);
+b.effectShow=true;
+renderBattleScene();
 
  setTimeout(()=>{
   let hit=battleDamage(b.player,b.enemy,b.player.type,b.enemy.type);
@@ -960,8 +994,9 @@ function battleNextRound(){
   battleLog(`第 ${b.round} 回合：${b.player.name} 发起攻击，造成 ${hit.damage} 伤害${hit.crit?"，触发暴击":""}${hit.factor>1?"，兵种克制生效":hit.factor<1?"，兵种被克制":""}。`);
 
   b.animPlayer="";
-  b.animEnemy="";
-  renderBattleScene();
+b.animEnemy="";
+b.effectShow=false;
+renderBattleScene();
 
   if(b.enemy.hp<=0){
    finishBattleScene("胜利");
@@ -970,8 +1005,10 @@ function battleNextRound(){
 
   setTimeout(()=>{
    b.animEnemy="attack";
-   b.animPlayer="hit";
-   renderBattleScene();
+b.animPlayer="hit";
+b.effect=battleEffectByType(b.enemy.type);
+b.effectShow=true;
+renderBattleScene();
 
    setTimeout(()=>{
     let back=battleDamage(b.enemy,b.player,b.enemy.type,b.player.type);
@@ -980,8 +1017,9 @@ function battleNextRound(){
     battleLog(`第 ${b.round} 回合：${b.enemy.name} 反击，造成 ${back.damage} 伤害${back.crit?"，触发暴击":""}${back.factor>1?"，敌方克制我方":back.factor<1?"，敌方被克制":""}。`);
 
     b.animEnemy="";
-    b.animPlayer="";
-    renderBattleScene();
+b.animPlayer="";
+b.effectShow=false;
+renderBattleScene();
 
     if(b.player.hp<=0){
      finishBattleScene("失败");
@@ -995,6 +1033,52 @@ function battleNextRound(){
  },300);
 }
 
+function skipBattleScene(){
+ if(!currentBattle||currentBattle.result)return;
+
+ if(!confirm("确定跳过战斗并直接结算吗？"))return;
+
+ let b=currentBattle;
+
+ if(b.timer){
+  clearTimeout(b.timer);
+  b.timer=null;
+ }
+
+ b.animPlayer="";
+ b.animEnemy="";
+ b.effectShow=false;
+
+ battleLog("你选择跳过战斗，系统开始快速结算。");
+
+ for(let i=0;i<60;i++){
+  let hit=battleDamage(b.player,b.enemy,b.player.type,b.enemy.type);
+  b.enemy.hp-=hit.damage;
+  battleLog(`快速结算：我方造成 ${hit.damage} 伤害${hit.crit?"，暴击":""}。`);
+
+  if(b.enemy.hp<=0){
+   finishBattleScene("胜利");
+   return;
+  }
+
+  let back=battleDamage(b.enemy,b.player,b.enemy.type,b.player.type);
+  b.player.hp-=back.damage;
+  battleLog(`快速结算：敌方造成 ${back.damage} 伤害${back.crit?"，暴击":""}。`);
+
+  if(b.player.hp<=0){
+   finishBattleScene("失败");
+   return;
+  }
+
+  b.round++;
+ }
+
+ if(b.enemy.hp<=b.player.hp){
+  finishBattleScene("胜利");
+ }else{
+  finishBattleScene("失败");
+ }
+}
 function finishBattleScene(result){
  if(!currentBattle)return;
 
