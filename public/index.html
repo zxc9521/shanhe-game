@@ -74,6 +74,12 @@ h2,h3{color:var(--gold);margin:0 0 12px}.grid{display:grid;gap:12px}.two{grid-te
 .building-card{display:grid;grid-template-columns:72px 1fr;gap:12px;align-items:center}
 .building-icon{width:72px;height:72px;border-radius:12px;border:1px solid var(--line);object-fit:cover;background:#100b07}
 .building-info{min-width:0}
+.map-icon{width:30px;height:30px;object-fit:contain;display:block;margin-bottom:2px}
+.troop-icon{width:22px;height:22px;object-fit:contain;vertical-align:-6px;margin-right:4px}
+.troop-mini-row{display:flex;gap:2px;flex-wrap:wrap;align-items:center;margin-top:8px}
+.troop-mini{width:18px;height:18px;object-fit:contain}
+.troop-mini-more{font-size:12px;color:var(--mut);margin-left:4px}
+.team-hero-block{display:grid;grid-template-columns:1fr;gap:6px}
 </style>
 </head>
 <body>
@@ -743,8 +749,66 @@ function moveMap(dx,dy){
 }
 function tileName(t){return {resource:"资源地",fieldTile:"野外农庄",salt:"盐田",horse:"马场",mine:"灵矿",battlefield:"古战场",trade:"商路节点",npc:"NPC据点",city:"城池",pass:"关卡"}[t]}
 function sym(t){return {resource:"资",fieldTile:"田",salt:"盐",horse:"马",mine:"矿",battlefield:"战",trade:"商",npc:"敌",city:"城",pass:"关"}[t]}
+const mapIconMap={
+ resource:"resource.png",
+ fieldTile:"field.png",
+ salt:"salt.png",
+ horse:"horse.png",
+ mine:"mine.png",
+ battlefield:"battlefield.png",
+ trade:"trade.png",
+ npc:"npc.png",
+ city:"city.png",
+ pass:"pass.png"
+};
+
+function mapIcon(type){
+ let file=mapIconMap[type]||"resource.png";
+ return `./assets/images/map/${file}`;
+}
+
+const troopIconMap={
+ 民兵:"militia.png",
+ 步兵:"infantry.png",
+ 弓兵:"archer.png",
+ 枪兵:"spearman.png",
+ 骑兵:"cavalry.png",
+ 器械:"siege.png",
+ 城防:"infantry.png"
+};
+
+function troopIcon(type){
+ let file=troopIconMap[type]||"militia.png";
+ return `./assets/images/troops/${file}`;
+}
+
+function troopLabel(type,count=""){
+ return `<span><img class="troop-icon" src="${troopIcon(type)}" onerror="this.style.display='none'">${type}${count!==""?"×"+count:""}</span>`;
+}
+
+function troopMiniIcons(troops){
+ let html="";
+ let shown=0;
+
+ for(let [type,count] of Object.entries(troops||{})){
+  let icons=Math.floor((count||0)/10);
+
+  for(let i=0;i<icons&&shown<80;i++){
+   html+=`<img class="troop-mini" title="${type}" src="${troopIcon(type)}" onerror="this.style.display='none'">`;
+   shown++;
+  }
+ }
+
+ let totalIcons=Object.values(troops||{}).reduce((a,b)=>a+Math.floor((b||0)/10),0);
+
+ if(totalIcons>80){
+  html+=`<span class="troop-mini-more">+${totalIcons-80}</span>`;
+ }
+
+ return html||"<span class='muted'>暂无士兵</span>";
+}
 function renderMap(){revealNear();let html="";for(let y=mapCenter.y-2;y<=mapCenter.y+2;y++)for(let x=mapCenter.x-2;x<=mapCenter.x+2;x++){let t=p().map[x+"_"+y];
-if(!t)continue;html+=`<div onclick="selTile('${x}_${y}')" class="tile ${t.type} ${t.owner===p().name?'owned':''} ${t.garrisonTeam?'garrison':''} ${t.enemy?'enemy':''} ${x===mapCenter.x&&y===mapCenter.y?'self':''} ${selectedTile===x+'_'+y?'sel':''}"><b>${sym(t.type)}</b><small>${x},${y}</small><small>${t.enemy?'敌军':t.garrisonTeam?'驻守':'Lv.'+t.lv}</small></div>`}
+if(!t)continue;html+=`<div onclick="selTile('${x}_${y}')" class="tile ${t.type} ${t.owner===p().name?'owned':''} ${t.garrisonTeam?'garrison':''} ${t.enemy?'enemy':''} ${x===mapCenter.x&&y===mapCenter.y?'self':''} ${selectedTile===x+'_'+y?'sel':''}"><img class="map-icon" src="${mapIcon(t.type)}" onerror="this.style.display='none'"><small>${x},${y}</small><small>${t.enemy?'敌军':t.garrisonTeam?'驻守':'Lv.'+t.lv}</small></div>`}
 document.getElementById("page-map").innerHTML=`<h2>共享大地图 300×300，当前视野 5×5</h2><div class="stat"><b>${invasionText()}</b><p class="muted">赛季剩余 ${daysLeft()} 天。赛季中期后，${season.invasionName} 会进入地图并占领地块。</p></div><br><div class="row"><button onclick="moveMap(0,-1)">上</button><button onclick="moveMap(-1,0)">左</button><button onclick="moveMap(1,0)">右</button><button onclick="moveMap(0,1)">下</button></div><br><div class="mapbox"><div class="map">${html}</div></div>`}
 function selTile(id){selectedTile=id;let t=p().map[id];side.innerHTML=`<div class="item"><h3>${tileName(t.type)} ${t.x},${t.y}</h3><p>等级：Lv.${t.lv}</p><p>地形：${t.terrain}</p><p>守军：${t.guard}</p><p>归属：${t.owner||"无"}</p><p>驻守：${t.garrisonTeam?teamName(t.garrisonTeam):"无"}</p><p>敌军：${t.enemy?"有":"无"}</p><select id="mapTeam">${p().teams.map(tm=>`<option value="${tm.id}">${tm.name}｜${teamPower(tm)}</option>`).join("")}</select><br><br><button onclick="marchOccupy('${id}')">派军队占领/进攻</button> <button onclick="scout('${id}')">侦查</button> <button onclick="withdrawGarrison('${id}')">撤回驻守</button></div>`;renderMap()}
 function scout(id){let t=p().map[id];if(!spend({粮草:80}))return;log(`侦查：${tileName(t.type)} Lv.${t.lv} 守军约${t.guard} 地形${t.terrain} 归属${t.owner||"无"}`);renderAll()}
@@ -782,10 +846,10 @@ function mainTroop(team){let arr=Object.entries(team.troops).sort((a,b)=>b[1]-a[
 function applyTeamLoss(team,loss){let left=loss;for(let k of Object.keys(team.troops)){let cut=Math.min(team.troops[k],left);team.troops[k]-=cut;left-=cut;if(left<=0)break}team.total=Object.values(team.troops).reduce((a,b)=>a+b,0)}
 
 function unlockedTroops(){let lv=p().buildings.军营;return Object.keys(troopTypes).filter(k=>lv>=troopTypes[k].unlock)}
-function renderBarracks(){let rows=Object.entries(troopTypes).map(([name,d])=>{let unlocked=p().buildings.军营>=d.unlock;return `<tr><td>${name}</td><td>${unlocked?"已解锁":"军营Lv."+d.unlock}</td><td>${p().troopStock[name]||0}</td><td>${d.baseAtk}/${d.baseDef}/${d.baseSpeed}</td><td>克${d.counter}，弱${d.weak}</td><td>${costText(d.cost)}</td><td><button ${unlocked?"":"disabled"} onclick="train('${name}')">征50人</button></td></tr>`}).join("");document.getElementById("page-barracks").innerHTML=`<h2>征兵</h2><p class="muted">升级军营可以解锁更多兵种。每次征兵以 50 人为单位。</p><table class="table"><tr><th>兵种</th><th>解锁</th><th>库存</th><th>攻/防/速</th><th>克制</th><th>50人消耗</th><th>操作</th></tr>${rows}</table>`}
+function renderBarracks(){let rows=Object.entries(troopTypes).map(([name,d])=>{let unlocked=p().buildings.军营>=d.unlock;return `<tr><td>${troopLabel(name)}</td><td>${unlocked?"已解锁":"军营Lv."+d.unlock}</td><td>${p().troopStock[name]||0}</td><td>${d.baseAtk}/${d.baseDef}/${d.baseSpeed}</td><td>克${d.counter}，弱${d.weak}</td><td>${costText(d.cost)}</td><td><button ${unlocked?"":"disabled"} onclick="train('${name}')">征50人</button></td></tr>`}).join("");document.getElementById("page-barracks").innerHTML=`<h2>征兵</h2><p class="muted">升级军营可以解锁更多兵种。每次征兵以 50 人为单位。</p><table class="table"><tr><th>兵种</th><th>解锁</th><th>库存</th><th>攻/防/速</th><th>克制</th><th>50人消耗</th><th>操作</th></tr>${rows}</table>`}
 function train(name){let d=troopTypes[name];if(!spend(d.cost))return;p().troopStock[name]=(p().troopStock[name]||0)+50;log(`征募${name} 50人。`);renderAll()}
 
-function renderTeams(){let availableHeroes=p().heroes.filter(u=>!u.assignedTeam);let options=availableHeroes.map(u=>`<option value="${u.uid}">${h(u.id).name} Lv.${u.lv}</option>`).join("");let troopInputs=Object.keys(troopTypes).map(k=>`<div class="field"><label>${k}，库存${p().troopStock[k]||0}</label><input id="team_${k}" type="number" min="0" step="50" value="0"></div>`).join("");document.getElementById("page-teams").innerHTML=`<h2>军队</h2><div class="grid two"><div class="stat"><h3>创建编队</h3><p class="muted">每个队伍必须有武将带领，至少 50 兵。军队名自动为 1队、2队、3队。</p><select id="teamHero">${options}</select><br><br>${troopInputs}<button onclick="createTeam()">创建队伍</button></div><div class="stat"><h3>兵种克制</h3><p>步兵克弓兵，弓兵克骑兵，骑兵克步兵，枪兵克骑兵，器械克城防。</p><p class="muted">武将战法只作用于本队。占领地块后，该队会变成驻守状态。</p></div></div><hr class="hr"><h2>已有军队</h2><div class="list">${p().teams.map(teamCard).join("")||"<div class='item muted'>暂无队伍。</div>"}</div>`}
+function renderTeams(){let availableHeroes=p().heroes.filter(u=>!u.assignedTeam);let options=availableHeroes.map(u=>`<option value="${u.uid}">${h(u.id).name} Lv.${u.lv}</option>`).join("");let troopInputs=Object.keys(troopTypes).map(k=>`<div class="field"><label>${troopLabel(k)}，库存${p().troopStock[k]||0}</label><input id="team_${k}" type="number" min="0" step="50" value="0"></div>`).join("");document.getElementById("page-teams").innerHTML=`<h2>军队</h2><div class="grid two"><div class="stat"><h3>创建编队</h3><p class="muted">每个队伍必须有武将带领，至少 50 兵。军队名自动为 1队、2队、3队。</p><select id="teamHero">${options}</select><br><br>${troopInputs}<button onclick="createTeam()">创建队伍</button></div><div class="stat"><h3>兵种克制</h3><p>步兵克弓兵，弓兵克骑兵，骑兵克步兵，枪兵克骑兵，器械克城防。</p><p class="muted">武将战法只作用于本队。占领地块后，该队会变成驻守状态。</p></div></div><hr class="hr"><h2>已有军队</h2><div class="list">${p().teams.map(teamCard).join("")||"<div class='item muted'>暂无队伍。</div>"}</div>`}
 function teamCard(tm){
  let hero=p().heroes.find(u=>u.uid===tm.heroUid);
  let ht=hero?h(hero.id):null;
@@ -801,7 +865,8 @@ function teamCard(tm){
   <h3>${tm.name}｜${tm.status}</h3>
   <p>带队武将：${ht?ht.name:"无"} ${ht&&ht.tag?`<span class="tag">${ht.tag}</span>`:""}</p>
   <p>兵力：${tm.total}｜主力：${mainTroop(tm)}｜军势：${teamPower(tm)}</p>
-  <p class="muted">兵种：${Object.entries(tm.troops).filter(x=>x[1]>0).map(([k,v])=>`${k}${v}`).join("，")}</p>
+  <p class="muted">兵种：${Object.entries(tm.troops).filter(x=>x[1]>0).map(([k,v])=>troopLabel(k,v)).join(" ")}</p>
+<div class="troop-mini-row">${troopMiniIcons(tm.troops)}</div>
 
   <div class="field">
    <label>更换将领</label>
@@ -980,7 +1045,7 @@ function renderBattleScene(){
    <div class="battle-unit player ${b.animPlayer}">
     <img class="battle-avatar" src="${b.player.avatar}" onerror="this.src='./assets/images/heroes/default.png'">
     <h3>${b.player.name}</h3>
-    <p class="muted">主力：${b.player.type}｜攻 ${b.player.atk}｜防 ${b.player.def}</p>
+    <p class="muted">主力：${troopLabel(b.player.type)}｜攻 ${b.player.atk}｜防 ${b.player.def}</p>
     <div class="hpbar"><div class="hpfill" style="width:${hpPercent(b.player)}%"></div></div>
     <p>${Math.max(0,Math.floor(b.player.hp))} / ${b.player.maxHp}</p>
    </div>
@@ -988,7 +1053,7 @@ function renderBattleScene(){
    <div class="battle-unit enemy ${b.animEnemy}">
     <img class="battle-avatar" src="${b.enemy.avatar}" onerror="this.src='./assets/images/heroes/default.png'">
     <h3>${b.enemy.name}</h3>
-    <p class="muted">兵种：${b.enemy.type}｜攻 ${b.enemy.atk}｜防 ${b.enemy.def}</p>
+    <p class="muted">兵种：${troopLabel(b.enemy.type)}｜攻 ${b.enemy.atk}｜防 ${b.enemy.def}</p>
     <div class="hpbar"><div class="hpfill" style="width:${hpPercent(b.enemy)}%"></div></div>
     <p>${Math.max(0,Math.floor(b.enemy.hp))} / ${b.enemy.maxHp}</p>
    </div>
