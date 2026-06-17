@@ -869,7 +869,7 @@ app.get("/api/black-market/state", (req, res) => {
 
 app.post("/api/black-market/trade", (req, res) => {
   const { acc, pwd, assetId, action } = req.body || {};
-  const amount = Math.max(1, Math.min(999999, Math.floor(Number(req.body?.amount || 0))));
+  const amount = Math.max(1, Math.min(999999, Math.floor(Number((req.body && req.body.amount) || 0))));
 
   if (!assetId || !["buy", "sell"].includes(action) || !amount) {
     return sendError(res, "交易参数错误");
