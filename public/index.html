@@ -1383,6 +1383,7 @@ function finishBattleScene(result){
 
  renderBattleScene();
  startBattleReturnCountdown();
+}
 function renderBattle(){document.getElementById("page-battle").innerHTML=`<h2>战斗页 / 战报</h2><p class="muted">大地图派军队进攻、占领、遭遇入侵军后会在这里生成战报。</p><div class="list">${p().reports.map(r=>`<div class="item"><h3>${r.title}｜${r.result}</h3><p>时间：${r.time}</p><p>我方战力：${r.atk}｜敌方战力：${r.def}｜损失：${r.loss}</p><p class="muted">${r.detail}</p></div>`).join("")||"<div class='item muted'>暂无战报。</div>"}</div>`}
 
 function heroAvatar(name){
@@ -2676,21 +2677,6 @@ setInterval(()=>{
  }
 },5000);
 
-if(acc&&pwdCache){
- fetch("/api/login",{
-  method:"POST",
-  headers:{"Content-Type":"application/json"},
-  body:JSON.stringify({acc,pwd:pwdCache})
- }).then(r=>r.json()).then(data=>{
-  if(data.ok){
-   db.users[acc]={name:data.name,a:acc,pwd:pwdCache};
-   db.players[acc]=data.player;
-   enter();
-  }else{
-   logout();
-  }
- }).catch(()=>logout());
-}
 if(acc&&pwdCache){
  fetch("/api/login",{
   method:"POST",
