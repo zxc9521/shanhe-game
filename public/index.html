@@ -102,6 +102,31 @@ h2,h3{color:var(--gold);margin:0 0 12px}.grid{display:grid;gap:12px}.two{grid-te
 .black-news{background:#080608;border:1px solid #3b2b47;border-radius:12px;padding:10px;line-height:1.7}
 .black-trade{display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px;margin-top:10px}
 @media(max-width:1050px){.black-layout{grid-template-columns:1fr}.black-trade{grid-template-columns:1fr}}
+.black-man-img{width:74px;height:74px;border-radius:12px;border:1px solid #6e5b87;object-fit:cover;background:#050507}
+.black-profit{font-size:13px;margin-top:4px}
+.black-news-list{display:grid;gap:8px}
+.black-news-item{background:#080608;border:1px solid #3b2b47;border-radius:10px;padding:9px;line-height:1.6}
+.black-news-item b{color:var(--gold)}
+.black-trade-list{max-height:260px;overflow:auto;background:#080608;border:1px solid #3b2b47;border-radius:12px;padding:8px}
+.black-trade-row{border-bottom:1px solid rgba(255,255,255,.07);padding:6px 0;font-size:13px;line-height:1.5}
+.black-up{color:#9bef9b}
+.black-down{color:#ff9a8e}
+.black-flat{color:var(--mut)}
+.boss-panel{display:grid;grid-template-columns:110px 1fr;gap:12px;align-items:center;background:linear-gradient(135deg,rgba(32,8,8,.95),rgba(15,10,18,.95));border:1px solid #9b3b32;border-radius:16px;padding:12px;box-shadow:0 0 24px rgba(201,90,77,.22)}
+.boss-avatar{width:110px;height:110px;object-fit:contain;filter:drop-shadow(0 0 12px rgba(201,90,77,.45))}
+.boss-name{color:#ffb36b;font-weight:900;font-size:18px;margin-bottom:6px}
+.boss-bubble{position:relative;background:#100b07;border:1px solid #9b3b32;border-radius:12px;padding:10px 12px;line-height:1.7;color:#ffe0b0}
+.boss-bubble:before{content:"";position:absolute;left:-10px;top:34px;border-top:9px solid transparent;border-bottom:9px solid transparent;border-right:10px solid #9b3b32}
+.boss-bubble:after{content:"";position:absolute;left:-8px;top:35px;border-top:8px solid transparent;border-bottom:8px solid transparent;border-right:9px solid #100b07}
+.boss-countdown{color:#ff9a8e;font-weight:700;margin-top:8px}
+@media(max-width:1050px){.boss-panel{grid-template-columns:80px 1fr}.boss-avatar{width:80px;height:80px}}
+.guide-mask{position:fixed;inset:0;background:rgba(0,0,0,.58);z-index:9998;display:grid;place-items:center;padding:18px}
+.guide-box{width:min(560px,100%);background:linear-gradient(145deg,#2b1b10,#120b07);border:1px solid var(--gold);border-radius:18px;padding:18px;box-shadow:0 0 38px rgba(224,173,79,.32)}
+.guide-title{font-size:24px;color:var(--gold);font-weight:900;margin-bottom:10px}
+.guide-text{line-height:1.8;color:var(--txt);white-space:pre-wrap}
+.guide-actions{display:flex;gap:8px;flex-wrap:wrap;justify-content:flex-end;margin-top:16px}
+.guide-step{color:var(--mut);font-size:13px;margin-top:10px}
+.guide-glow{outline:3px solid var(--gold)!important;box-shadow:0 0 20px rgba(224,173,79,.55)!important;position:relative;z-index:9999}
 </style>
 </head>
 <body>
@@ -235,7 +260,20 @@ let activeChat="world", chatTimer=null, chatRendered=false;
 let chatMessages={world:[],alliance:[],private:[]};
 let chatLastId={world:0,alliance:0,private:0};
 let chatSending=false, chatNextSendAt=0;
-const season={totalDays:30,invasionDay:15,invasionName:"玄旌禁军",bossName:"玄旌王朝"};
+const season={totalDays:30,invasionDay:4,invasionName:"玄旌禁军",bossName:"玄旌王朝"};
+const bossLines=[
+ "三日之后，玄旌铁骑将踏碎你们所谓的山河。",
+ "我已看见你城中的炊烟，也看见它熄灭时的样子。",
+ "扩张吧，挣扎吧。你们占下的每一寸土地，终将成为我的战利品。",
+ "告诉那些同盟首领，跪下献城者，可少受一刀。",
+ "你们以为这是赛季？不，这是玄旌王朝给弱者的倒计时。",
+ "三天。修墙，征兵，祈祷。然后迎接我的旗帜。",
+ "我不急。恐惧会先替我抵达你的主城。",
+ "等我的黑旗升起，你们会明白什么叫真正的王朝。"
+];
+
+let bossLineIndex=0;
+let bossLineTick=0;
 
 const heroRaw=[
 ["陈武",3,"","步兵",62,58,35,48,36,"奋击：本队步兵攻击小幅提高"],["周仓",3,"","步兵",66,61,31,44,34,"护主：本队防御小幅提高"],["廖化",3,"","骑兵",63,57,42,53,32,"老将：疲劳影响略降低"],["韩当",3,"","弓兵",65,55,38,49,41,"齐射：本队弓兵攻击提高"],["朱治",3,"","步兵",51,54,55,38,37,"整军：本队士气恢复提高"],["曹洪",3,"","骑兵",64,59,40,50,32,"急援：驻守时防御提高"],
@@ -394,7 +432,7 @@ productionBuildings:{
 blackMarket:{holdings:{}},blackMarketIntro:false,lastProduce:now(),betaGift:false,bag:{传说碎片宝箱:0,五星异世自选箱:0,六星异世自选箱:0},frags:{},
   farm:{exp:0,plots:[{id:"2_2",unlocked:true,crop:"",mature:0}]},
 dungeons:{attempts:{},run:null},
-  recruitLogs:[],mails:[],claimedTasks:{},logs:["进入第一赛季。玄旌禁军将在赛季中期入侵大地图。"],pity6:0,pity7:0,newbie:false
+  recruitLogs:[],mails:[],claimedTasks:{},guide:{done:false,step:0},logs:["进入第一赛季。玄旌禁军将在赛季中期入侵大地图。"],pity6:0,pity7:0,newbie:false
  }
 }
 function genMap(){let types=["resource","resource","fieldTile","salt","horse","mine","battlefield","trade","npc","city","pass"],m={};for(let y=0;y<100;y++)for(let x=0;x<100;x++){let d=Math.abs(x-50)+Math.abs(y-50),type=pick(types);if(x===50&&y===50)type="city";m[x+"_"+y]={x,y,type,lv:Math.max(1,Math.ceil(d/18)),owner:x===50&&y===50?"主城":"",garrisonTeam:"",enemy:x>55&&y>55&&Math.random()<.025,res:pick(["粮草","木材","石料","铁矿","铜钱"]),guard:500+Math.ceil(d/10)*450,terrain:pick(["平原","山地","森林","河流","荒漠","古战场"])}}return m}
@@ -408,7 +446,11 @@ function enter(){
  restoreBgm();
  mapCenter=p().center||{x:150,y:150};
  worldSize=p().worldSize||300;
- loadWorldAround(()=>{renderAll();show(page)});
+ loadWorldAround(()=>{
+ renderAll();
+ show(page);
+ maybeStartGuide();
+});
 }
 function loadWorldAround(done){
  if(!acc){
@@ -437,13 +479,22 @@ function migratePlayer(){
  if(!q.bag)q.bag={};
  if(!q.seedBag)q.seedBag={};
  if(!q.market)q.market={lastRefresh:0,stock:[]};
-if(!q.blackMarket)q.blackMarket={holdings:{}};
+if(!q.blackMarket)q.blackMarket={holdings:{},avgCost:{},trades:[]};
 if(!q.blackMarket.holdings)q.blackMarket.holdings={};
+if(!q.blackMarket.avgCost)q.blackMarket.avgCost={};
+if(!q.blackMarket.trades)q.blackMarket.trades=[];
 if(q.blackMarketIntro==null)q.blackMarketIntro=false;
 if(q.res.元宝==null)q.res.元宝=0;
 if(!q.dungeons)q.dungeons={attempts:{},run:null};
 if(!q.dungeons.attempts)q.dungeons.attempts={};
 if(q.dungeons.run===undefined)q.dungeons.run=null;
+if(!q.guide)q.guide={done:false,step:0};
+if(q.guide.done==null)q.guide.done=false;
+if(q.guide.step==null)q.guide.step=0;
+if(!q.bossInvasionAt){
+ q.bossInvasionAt=now()+3*dayMs();
+ q.invasionSpawned=false;
+}
  if(!q.lastProduce)q.lastProduce=now();
  if(q.betaGift==null)q.betaGift=false;
  if(q.bag.传说碎片宝箱==null)q.bag.传说碎片宝箱=0;
@@ -529,6 +580,130 @@ function resourceIcon(name){
  let file=resourceIconMap[name];
  if(!file)return "";
  return `<img class="res-icon" src="./assets/images/resources/${file}" onerror="this.style.display='none'">`;
+}
+const guideSteps=[
+ {
+  title:"欢迎来到山河余烬",
+  text:"将军，山河破碎，玄旌王朝正在逼近。\n\n你将从一座小城开始，建设建筑、招募武将、征兵组队、占领土地，并在赛季入侵中活下来。\n\n接下来我会带你走一遍基础流程。",
+  page:"home"
+ },
+ {
+  title:"第一步：查看主页建筑",
+  text:"这里是你的主城。\n\n普通建筑负责解锁功能，生产建筑负责自动产出资源。\n\n建议前期优先升级：官府、军营、仓库。",
+  page:"home"
+ },
+ {
+  title:"第二步：领取邮箱奖励",
+  text:"主页下方是邮箱。\n\n活动奖励、GM补偿、副本奖励、兑换奖励都会先进入邮箱。\n\n如果你看到未领取邮件，可以点击“一键领取全部附件”。",
+  page:"home"
+ },
+ {
+  title:"第三步：征兵",
+  text:"现在去征兵页。\n\n征兵会消耗粮草、木材、铁矿和兵源。\n\n兵源就是可训练的新兵人口，训练后会进入兵种库存。",
+  page:"barracks"
+ },
+ {
+  title:"第四步：创建军队",
+  text:"现在去军队页。\n\n选择一个武将，再分配士兵，就可以创建队伍。\n\n队伍创建后才能去地图占领地块。",
+  page:"teams"
+ },
+ {
+  title:"第五步：打开大地图",
+  text:"这里是共享大地图。\n\n所有玩家看到的是同一个世界。\n\n点击地块后，可以侦查，也可以派军队进攻占领。",
+  page:"map"
+ },
+ {
+  title:"第六步：注意玄旌王朝",
+  text:"地图上方的反派 Boss 会不断威胁你。\n\n倒计时结束后，玄旌禁军会入侵地图，占领部分地块。\n\n在那之前，尽量提升军队实力。",
+  page:"map"
+ },
+ {
+  title:"第七步：武将培养",
+  text:"武将决定队伍强度。\n\n你可以升级武将、提升战法、筛选整理武将。\n\n高星武将获得时还会触发世界横幅通报。",
+  page:"heroes"
+ },
+ {
+  title:"第八步：探索更多系统",
+  text:"你已经掌握基础玩法。\n\n接下来可以尝试：副本、种田、市场、黑市、聊天、同盟、限时活动。\n\n祝你在山河余烬中活到最后。",
+  page:"home",
+  finish:true
+ }
+];
+
+function maybeStartGuide(){
+ if(!acc||!p())return;
+ if(p().guide&&p().guide.done)return;
+ setTimeout(()=>showGuideStep(p().guide?.step||0),500);
+}
+
+function showGuideStep(index){
+ if(!p().guide)p().guide={done:false,step:0};
+
+ if(index>=guideSteps.length){
+  finishGuide();
+  return;
+ }
+
+ let step=guideSteps[index];
+ p().guide.step=index;
+
+ if(step.page&&page!==step.page){
+  show(step.page);
+ }
+
+ const mask=document.getElementById("guideMask");
+ const title=document.getElementById("guideTitle");
+ const text=document.getElementById("guideText");
+ const stepText=document.getElementById("guideStep");
+
+ if(!mask||!title||!text||!stepText)return;
+
+ title.textContent=step.title;
+ text.textContent=step.text;
+ stepText.textContent=`教程进度：${index+1} / ${guideSteps.length}`;
+
+ mask.classList.remove("hidden");
+ save();
+}
+
+function nextGuide(){
+ if(!p().guide)p().guide={done:false,step:0};
+
+ let index=p().guide.step||0;
+ let step=guideSteps[index];
+
+ if(step&&step.finish){
+  finishGuide();
+  return;
+ }
+
+ showGuideStep(index+1);
+}
+
+function skipGuide(){
+ if(!confirm("确定跳过新手教程吗？以后不会自动弹出。"))return;
+ finishGuide();
+}
+
+function finishGuide(){
+ if(!p().guide)p().guide={};
+ p().guide.done=true;
+ p().guide.step=guideSteps.length;
+ save();
+
+ const mask=document.getElementById("guideMask");
+ if(mask)mask.classList.add("hidden");
+
+ log("完成新手教程。");
+ renderAll();
+}
+
+function restartGuide(){
+ if(!p().guide)p().guide={};
+ p().guide.done=false;
+ p().guide.step=0;
+ save();
+ showGuideStep(0);
 }
 function renderAll(){pinfo.textContent=`用户名：${p().name}｜账号：${p().a}｜未读邮件 ${unreadMailCount()} 封`;renderRes();renderLogs();renderPage()}
 function renderRes(){
@@ -677,7 +852,7 @@ function productionPower(name){
  return b.count*b.lv;
 }
 function renderHome(){
- let html=`<h2>主页建筑</h2><div class="grid three">`;
+ let html=`<h2>主页建筑</h2><div class="row"><button onclick="restartGuide()">重看新手教程</button></div><br><div class="grid three">`;
 
  for(let [k,lv] of Object.entries(p().buildings)){
   let d=buildingData(k,lv);
@@ -742,8 +917,37 @@ function ownedCount(q=p()){return Object.values(q.map).filter(t=>t.owner===q.nam
 
 function seasonDay(){return Math.min(season.totalDays,Math.floor((now()-p().createdAt)/dayMs())+1)}
 function daysLeft(){return Math.max(0,season.totalDays-seasonDay()+1)}
-function invasionText(){let d=season.invasionDay-seasonDay();return d>0?`还有 ${d} 天，${season.invasionName}军队入侵`:`${season.invasionName}已经进入大地图，正在与玩家争夺地块`}
-function spawnInvasionIfNeeded(){if(seasonDay()<season.invasionDay||p().invasionSpawned)return;let keys=Object.keys(p().map).filter(k=>p().map[k].type!=="city");for(let i=0;i<24;i++){let t=p().map[pick(keys)];t.enemy=true;t.owner=season.invasionName}p().invasionSpawned=true;log(`${season.invasionName}入侵大地图！部分地块已被敌军占领。`);save()}
+function invasionText(){
+ let q=p();
+ if(!q.bossInvasionAt)q.bossInvasionAt=now()+3*dayMs();
+
+ let left=q.bossInvasionAt-now();
+
+ if(left>0){
+  let days=Math.ceil(left/dayMs());
+  return `还有 ${days} 天入侵`;
+ }
+
+ return `${season.invasionName}已经进入大地图，正在与玩家争夺地块`;
+}
+function spawnInvasionIfNeeded(){
+ let q=p();
+ if(!q.bossInvasionAt)q.bossInvasionAt=now()+3*dayMs();
+ if(now()<q.bossInvasionAt||q.invasionSpawned)return;
+
+ let keys=Object.keys(q.map).filter(k=>q.map[k].type!=="city");
+
+ for(let i=0;i<24;i++){
+  let t=q.map[pick(keys)];
+  if(!t)continue;
+  t.enemy=true;
+  t.owner=season.invasionName;
+ }
+
+ q.invasionSpawned=true;
+ log(`${season.invasionName}入侵大地图！部分地块已被敌军占领。`);
+ save();
+}
 function revealNear(){
  for(let dy=-2;dy<=2;dy++)for(let dx=-2;dx<=2;dx++){
   let x=mapCenter.x+dx,y=mapCenter.y+dy;
@@ -841,9 +1045,39 @@ function troopMiniIcons(troops){
 
  return html||"<span class='muted'>暂无士兵</span>";
 }
+function bossCountdownText(){
+ let q=p();
+ if(!q.bossInvasionAt)q.bossInvasionAt=now()+3*dayMs();
+
+ let left=q.bossInvasionAt-now();
+
+ if(left<=0)return "玄旌禁军已经入侵";
+
+ let total=Math.ceil(left/1000);
+ let days=Math.floor(total/86400);
+ let hours=Math.floor((total%86400)/3600);
+ let minutes=Math.floor((total%3600)/60);
+
+ if(days>0)return `还有 ${days} 天 ${hours} 小时入侵`;
+ if(hours>0)return `还有 ${hours} 小时 ${minutes} 分钟入侵`;
+ return `还有 ${minutes} 分钟入侵`;
+}
+
+function renderBossPanel(){
+ let line=bossLines[bossLineIndex%bossLines.length];
+
+ return `<div class="boss-panel">
+  <img class="boss-avatar" src="./assets/images/boss/xuanjing_boss.png" onerror="this.style.display='none'">
+  <div>
+   <div class="boss-name">${season.bossName}</div>
+   <div class="boss-bubble">${line}</div>
+   <div class="boss-countdown">${bossCountdownText()}</div>
+  </div>
+ </div><br>`;
+}
 function renderMap(){revealNear();let html="";for(let y=mapCenter.y-2;y<=mapCenter.y+2;y++)for(let x=mapCenter.x-2;x<=mapCenter.x+2;x++){let t=p().map[x+"_"+y];
 if(!t)continue;html+=`<div onclick="selTile('${x}_${y}')" class="tile ${t.type} ${t.owner===p().name?'owned':''} ${t.garrisonTeam?'garrison':''} ${t.enemy?'enemy':''} ${x===mapCenter.x&&y===mapCenter.y?'self':''} ${selectedTile===x+'_'+y?'sel':''}"><img class="map-icon" src="${mapIcon(t.type)}" onerror="this.style.display='none'"><small>${x},${y}</small><small>${t.enemy?'敌军':t.garrisonTeam?'驻守':'Lv.'+t.lv}</small></div>`}
-document.getElementById("page-map").innerHTML=`<h2>共享大地图 300×300，当前视野 5×5</h2><div class="stat"><b>${invasionText()}</b><p class="muted">赛季剩余 ${daysLeft()} 天。赛季中期后，${season.invasionName} 会进入地图并占领地块。</p></div><br><div class="row"><button onclick="moveMap(0,-1)">上</button><button onclick="moveMap(-1,0)">左</button><button onclick="moveMap(1,0)">右</button><button onclick="moveMap(0,1)">下</button></div><br><div class="mapbox"><div class="map">${html}</div></div>`}
+document.getElementById("page-map").innerHTML=`${renderBossPanel()}<h2>共享大地图 300×300，当前视野 5×5</h2><div class="stat"><b>${invasionText()}</b><p class="muted">赛季剩余 ${daysLeft()} 天。赛季中期后，${season.invasionName} 会进入地图并占领地块。</p></div><br><div class="row"><button onclick="moveMap(0,-1)">上</button><button onclick="moveMap(-1,0)">左</button><button onclick="moveMap(1,0)">右</button><button onclick="moveMap(0,1)">下</button></div><br><div class="mapbox"><div class="map">${html}</div></div>`}
 function selTile(id){selectedTile=id;let t=p().map[id];side.innerHTML=`<div class="item"><h3>${tileName(t.type)} ${t.x},${t.y}</h3><p>等级：Lv.${t.lv}</p><p>地形：${t.terrain}</p><p>守军：${t.guard}</p><p>归属：${t.owner||"无"}</p><p>驻守：${t.garrisonTeam?teamName(t.garrisonTeam):"无"}</p><p>敌军：${t.enemy?"有":"无"}</p><select id="mapTeam">${p().teams.map(tm=>`<option value="${tm.id}">${tm.name}｜${teamPower(tm)}</option>`).join("")}</select><br><br><button onclick="marchOccupy('${id}')">派军队占领/进攻</button> <button onclick="scout('${id}')">侦查</button> <button onclick="withdrawGarrison('${id}')">撤回驻守</button></div>`;renderMap()}
 function scout(id){let t=p().map[id];if(!spend({粮草:80}))return;log(`侦查：${tileName(t.type)} Lv.${t.lv} 守军约${t.guard} 地形${t.terrain} 归属${t.owner||"无"}`);renderAll()}
 function marchOccupy(id){
@@ -2226,6 +2460,9 @@ function loadBlackMarket(done){
 
    if(data.res){
     p().res=data.res;
+   }else{
+    if(data.yuanbao!=null)p().res.元宝=data.yuanbao;
+    if(data.boundGold!=null)p().res.绑定元宝=data.boundGold;
    }
 
    if(done)done();
@@ -2233,6 +2470,73 @@ function loadBlackMarket(done){
   .catch(()=>alert("黑市连接失败"));
 }
 
+function blackMarketAssetStats(asset){
+ let history=asset.history||[];
+ let prev=history[history.length-2]?.price||asset.price;
+ let diff=asset.price-prev;
+ let percent=prev?diff/prev*100:0;
+ let cls=diff>0?"black-up":diff<0?"black-down":"black-flat";
+
+ return {
+  diff,
+  percent,
+  cls,
+  text:`${diff>=0?"+":""}${diff}（${percent>=0?"+":""}${percent.toFixed(2)}%）`
+ };
+}
+
+function blackMarketProfit(asset){
+ let qty=blackMarketHolding(asset.id);
+ let avg=blackMarketState?.avgCost?.[asset.id]||0;
+
+ if(!qty||!avg){
+  return {profit:0,percent:0,cls:"black-flat",text:"暂无持仓"};
+ }
+
+ let value=qty*asset.price;
+ let cost=qty*avg;
+ let profit=value-cost;
+ let percent=cost?profit/cost*100:0;
+ let cls=profit>0?"black-up":profit<0?"black-down":"black-flat";
+
+ return {
+  profit,
+  percent,
+  cls,
+  text:`${profit>=0?"+":""}${profit} 元宝估值差（${percent>=0?"+":""}${percent.toFixed(2)}%）`
+ };
+}
+
+function blackMarketNewsHtml(){
+ let news=blackMarketState?.news||[];
+
+ if(!news.length){
+  return "<div class='muted'>暂无黑市新闻。</div>";
+ }
+
+ return `<div class="black-news-list">${news.map(n=>`<div class="black-news-item">
+  <b>${escapeHtml(n.title)}</b>
+  <p>${escapeHtml(n.text)}</p>
+  <p class="muted">风向：${escapeHtml(n.mood)}｜预估波动约 ${escapeHtml(n.percent)}%</p>
+ </div>`).join("")}</div>`;
+}
+
+function blackMarketTradesHtml(){
+ let trades=blackMarketState?.trades||[];
+
+ if(!trades.length){
+  return "<div class='muted'>暂无交易记录。</div>";
+ }
+
+ return `<div class="black-trade-list">${trades.map(t=>{
+  let cls=t.action==="buy"?"black-up":"black-down";
+  return `<div class="black-trade-row">
+   <b class="${cls}">${t.action==="buy"?"买入":"卖出"} ${escapeHtml(t.assetName)}</b>
+   <div>数量：${t.amount}｜价格：${t.price}｜总额：${t.total}</div>
+   <div class="muted">${new Date(t.time).toLocaleString()}</div>
+  </div>`;
+ }).join("")}</div>`;
+}
 function renderBlackMarket(){
  blackMarketIntro();
 
@@ -2248,13 +2552,29 @@ function renderBlackMarket(){
  let selected=blackMarketState.assets.find(x=>x.id===selectedBlackAsset)||blackMarketState.assets[0];
  if(!selected)return;
 
+ let selectedStats=blackMarketAssetStats(selected);
+ let selectedProfit=blackMarketProfit(selected);
+ let selectedAvg=blackMarketState.avgCost?.[selected.id]||0;
+ let selectedQty=blackMarketHolding(selected.id);
+ let selectedValue=selectedQty*selected.price;
+
  box.innerHTML=`<h2>黑市</h2>
  <p class="muted">每小时更新一次涨跌。绑定元宝可买入，售出获得元宝。元宝功能类似绑定元宝，后期可用于玩家交易。</p>
 
  <div class="black-layout">
   <div class="black-screen">
    <h3>${selected.name}</h3>
-   <p>当前价格：<b class="gold">${selected.price}</b> 绑定元宝/份｜持有：<b class="gold">${blackMarketHolding(selected.id)}</b> 份</p>
+   <p>
+    当前价格：<b class="gold">${selected.price}</b> 绑定元宝/份
+    ｜涨跌：<b class="${selectedStats.cls}">${selectedStats.text}</b>
+   </p>
+   <p>
+    持有：<b class="gold">${selectedQty}</b> 份
+    ｜持仓均价：<b class="gold">${selectedAvg||"暂无"}</b>
+    ｜当前估值：<b class="gold">${selectedValue}</b>
+   </p>
+   <p class="black-profit ${selectedProfit.cls}">浮动盈亏：${selectedProfit.text}</p>
+
    <canvas id="blackChart" class="black-chart" width="800" height="320"></canvas>
 
    <div class="black-trade">
@@ -2264,6 +2584,11 @@ function renderBlackMarket(){
    </div>
 
    <p class="muted">距离下次涨跌约：${blackMarketNextText()}</p>
+
+   <hr class="hr">
+
+   <h3>交易记录</h3>
+   ${blackMarketTradesHtml()}
   </div>
 
   <div class="black-side">
@@ -2271,21 +2596,21 @@ function renderBlackMarket(){
     <h3>产业列表</h3>
     <div class="list">
      ${blackMarketState.assets.map(a=>{
-      let last=a.history[a.history.length-2]?.price||a.price;
-      let diff=a.price-last;
-      let cls=diff>=0?"ok":"bad";
+      let s=blackMarketAssetStats(a);
+      let profit=blackMarketProfit(a);
       return `<div class="black-asset ${a.id===selected.id?"active":""}" onclick="selectBlackAsset('${a.id}')">
        <b>${a.name}</b>
        <p>价格：${a.price}</p>
-       <p class="${cls}">${diff>=0?"上涨":"下跌"} ${Math.abs(diff)}</p>
+       <p class="${s.cls}">${s.text}</p>
        <p class="muted">持有：${blackMarketHolding(a.id)} 份</p>
+       <p class="${profit.cls}">${profit.text}</p>
       </div>`;
      }).join("")}
     </div>
    </div>
 
    <div class="black-man">
-    <div class="black-man-face">🕶️</div>
+    <img class="black-man-img" src="./assets/images/blackmarket/black_man.png" onerror="this.outerHTML='<div class=&quot;black-man-face&quot;>🕶️</div>'">
     <div>
      <h3>黑衣人</h3>
      <p class="muted">他声称知道下一轮风向。300元宝一次，70%真消息，30%假消息。</p>
@@ -2294,6 +2619,11 @@ function renderBlackMarket(){
    </div>
 
    <div id="blackNews" class="black-news muted">黑衣人靠在墙边，似乎在等你开价。</div>
+
+   <div class="stat">
+    <h3>黑市新闻</h3>
+    ${blackMarketNewsHtml()}
+   </div>
   </div>
  </div>`;
 
@@ -2314,11 +2644,15 @@ function drawBlackChart(asset){
  const ctx=canvas.getContext("2d");
  const w=canvas.width;
  const h=canvas.height;
- const pad=35;
+ const pad=42;
  const history=asset.history||[];
 
  ctx.clearRect(0,0,w,h);
- ctx.fillStyle="#05070a";
+
+ const bg=ctx.createLinearGradient(0,0,0,h);
+ bg.addColorStop(0,"#07111d");
+ bg.addColorStop(1,"#030507");
+ ctx.fillStyle=bg;
  ctx.fillRect(0,0,w,h);
 
  ctx.strokeStyle="#1f3148";
@@ -2332,8 +2666,17 @@ function drawBlackChart(asset){
   ctx.stroke();
  }
 
+ for(let i=0;i<8;i++){
+  let x=pad+(w-pad*2)/7*i;
+  ctx.beginPath();
+  ctx.moveTo(x,pad);
+  ctx.lineTo(x,h-pad);
+  ctx.stroke();
+ }
+
  if(history.length<2){
   ctx.fillStyle="#bba17a";
+  ctx.font="16px Microsoft YaHei";
   ctx.fillText("暂无曲线数据，等待下次刷新。",pad,40);
   return;
  }
@@ -2343,32 +2686,66 @@ function drawBlackChart(asset){
  let max=Math.max(...prices);
  if(max===min)max=min+1;
 
- ctx.strokeStyle="#74d7ff";
- ctx.lineWidth=3;
+ function px(i){
+  return pad+(w-pad*2)*(i/(history.length-1));
+ }
+
+ function py(price){
+  return h-pad-(h-pad*2)*((price-min)/(max-min));
+ }
+
  ctx.beginPath();
-
  history.forEach((point,i)=>{
-  let x=pad+(w-pad*2)*(i/(history.length-1));
-  let y=h-pad-(h-pad*2)*((point.price-min)/(max-min));
-
+  let x=px(i);
+  let y=py(point.price);
   if(i===0)ctx.moveTo(x,y);
   else ctx.lineTo(x,y);
  });
 
+ ctx.lineTo(px(history.length-1),h-pad);
+ ctx.lineTo(px(0),h-pad);
+ ctx.closePath();
+
+ let fill=ctx.createLinearGradient(0,pad,0,h-pad);
+ fill.addColorStop(0,"rgba(116,215,255,.28)");
+ fill.addColorStop(1,"rgba(116,215,255,.02)");
+ ctx.fillStyle=fill;
+ ctx.fill();
+
+ ctx.beginPath();
+ history.forEach((point,i)=>{
+  let x=px(i);
+  let y=py(point.price);
+  if(i===0)ctx.moveTo(x,y);
+  else ctx.lineTo(x,y);
+ });
+
+ ctx.strokeStyle="#74d7ff";
+ ctx.lineWidth=3;
  ctx.stroke();
+
+ history.forEach((point,i)=>{
+  let x=px(i);
+  let y=py(point.price);
+
+  ctx.fillStyle=i===history.length-1?"#9bef9b":"#e0ad4f";
+  ctx.beginPath();
+  ctx.arc(x,y,i===history.length-1?5:3,0,Math.PI*2);
+  ctx.fill();
+ });
+
+ let first=history[0].price;
+ let last=history[history.length-1].price;
+ let diff=last-first;
+ let percent=first?diff/first*100:0;
 
  ctx.fillStyle="#e0ad4f";
  ctx.font="16px Microsoft YaHei";
- ctx.fillText(`最高 ${max}`,pad,22);
- ctx.fillText(`最低 ${min}`,pad,h-10);
+ ctx.fillText(`最高 ${max}`,pad,24);
+ ctx.fillText(`最低 ${min}`,pad,h-12);
 
- let last=history[history.length-1];
- ctx.fillStyle="#9bef9b";
- ctx.beginPath();
- let lastX=w-pad;
- let lastY=h-pad-(h-pad*2)*((last.price-min)/(max-min));
- ctx.arc(lastX,lastY,5,0,Math.PI*2);
- ctx.fill();
+ ctx.fillStyle=diff>=0?"#9bef9b":"#ff9a8e";
+ ctx.fillText(`区间涨跌 ${diff>=0?"+":""}${diff}（${percent>=0?"+":""}${percent.toFixed(2)}%）`,w-260,24);
 }
 
 function blackMarketTrade(action){
@@ -2385,6 +2762,9 @@ function blackMarketTrade(action){
   if(data.res){
    p().res=data.res;
   }
+  if(data.holdings)blackMarketState.holdings=data.holdings;
+  if(data.avgCost)blackMarketState.avgCost=data.avgCost;
+  if(data.trades)blackMarketState.trades=data.trades;
 
   log(`黑市${action==="buy"?"买入":"卖出"} ${blackMarketAssetName(selectedBlackAsset)} ×${amount}。`);
 
@@ -2669,6 +3049,14 @@ setInterval(()=>{
   if(page==="market"){
    renderMarket();
   }
+    if(page==="map"){
+   bossLineTick++;
+   if(bossLineTick>=6){
+    bossLineTick=0;
+    bossLineIndex++;
+    renderMap();
+   }
+  }
  }
 },1000);
 setInterval(()=>{
@@ -2693,5 +3081,16 @@ if(acc&&pwdCache){
  }).catch(()=>logout());
 }
 </script>
+<div id="guideMask" class="guide-mask hidden">
+  <div class="guide-box">
+    <div id="guideTitle" class="guide-title"></div>
+    <div id="guideText" class="guide-text"></div>
+    <div id="guideStep" class="guide-step"></div>
+    <div class="guide-actions">
+      <button onclick="skipGuide()">跳过教程</button>
+      <button onclick="nextGuide()">下一步</button>
+    </div>
+  </div>
+</div>
 </body>
 </html>

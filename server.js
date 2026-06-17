@@ -287,6 +287,58 @@ function formatBlackMarketRow(row) {
   };
 }
 
+function buildBlackMarketNews(assets) {
+  const news = [];
+
+  for (const asset of assets) {
+    const move = Number(asset.nextMove || 0);
+    const abs = Math.abs(move * 100).toFixed(1);
+
+    if (move > 0.06) {
+      news.push({
+        assetId: asset.id,
+        title: `${asset.name} 获神秘买盘关注`,
+        text: `黑市传闻，有几路资金正在暗中扫货，${asset.name} 的下一轮波动可能偏强，市场情绪明显升温。`,
+        mood: "利好",
+        percent: abs
+      });
+    } else if (move > 0.015) {
+      news.push({
+        assetId: asset.id,
+        title: `${asset.name} 交易热度上升`,
+        text: `${asset.name} 最近成交活跃，部分黑市商队认为短期还有上行动能，但分歧仍在。`,
+        mood: "偏强",
+        percent: abs
+      });
+    } else if (move < -0.06) {
+      news.push({
+        assetId: asset.id,
+        title: `${asset.name} 出现撤资传闻`,
+        text: `有黑衣掮客称，${asset.name} 背后资金正在松动，下一轮可能承压，谨慎者已经开始离场。`,
+        mood: "利空",
+        percent: abs
+      });
+    } else if (move < -0.015) {
+      news.push({
+        assetId: asset.id,
+        title: `${asset.name} 短期情绪转弱`,
+        text: `${asset.name} 的黑市盘口略显疲态，部分买家开始观望，价格可能出现小幅回落。`,
+        mood: "偏弱",
+        percent: abs
+      });
+    } else {
+      news.push({
+        assetId: asset.id,
+        title: `${asset.name} 暂无明显风向`,
+        text: `${asset.name} 当前多空分歧不大，黑市屏幕上的波动暂时平稳，仍需等待下一轮信号。`,
+        mood: "观望",
+        percent: abs
+      });
+    }
+  }
+
+  return news.slice(0, 8);
+}
 function loadBlackMarketRows(callback) {
   db.all("SELECT * FROM black_market ORDER BY id ASC", [], (err, rows) => {
     if (err) return callback(err);
@@ -849,8 +901,10 @@ app.get("/api/black-market/state", (req, res) => {
       const player = user.player;
       if (!player.res) player.res = {};
       if (player.res.元宝 == null) player.res.元宝 = 0;
-      if (!player.blackMarket) player.blackMarket = { holdings: {} };
+      if (!player.blackMarket) player.blackMarket = { holdings: {}, avgCost: {}, trades: [] };
       if (!player.blackMarket.holdings) player.blackMarket.holdings = {};
+      if (!player.blackMarket.avgCost) player.blackMarket.avgCost = {};
+      if (!player.blackMarket.trades) player.blackMarket.trades = [];
 
       savePlayer(acc, player, saveErr => {
         if (saveErr) return sendError(res, "保存黑市数据失败");
@@ -858,9 +912,15 @@ app.get("/api/black-market/state", (req, res) => {
         sendOk(res, {
           assets,
           holdings: player.blackMarket.holdings,
+          avgCost: player.blackMarket.avgCost,
+          trades: player.blackMarket.trades.slice(-30).reverse(),
+          news: buildBlackMarketNews(assets),
           yuanbao: player.res.元宝 || 0,
           boundGold: player.res.绑定元宝 || 0,
-          nextUpdateIn: Math.max(0, BLACK_MARKET_UPDATE_MS - (Date.now() - Math.max(...assets.map(a => a.lastUpdate))))
+          nextUpdateIn: Math.max(
+            0,
+            BLACK_MARKET_UPDATE_MS - (Date.now() - Math.max(...assets.map(a => a.lastUpdate)))
+          )
         });
       });
     });
@@ -869,7 +929,7 @@ app.get("/api/black-market/state", (req, res) => {
 
 app.post("/api/black-market/trade", (req, res) => {
   const { acc, pwd, assetId, action } = req.body || {};
-  const amount = Math.max(1, Math.min(999999, Math.floor(Number((req.body && req.body.amount) || 0))));
+  const amount = Math.max(1, Math.floor(Number(req.body?.amount || 0)));
 
   if (!assetId || !["buy", "sell"].includes(action) || !amount) {
     return sendError(res, "交易参数错误");
@@ -889,28 +949,56 @@ app.post("/api/black-market/trade", (req, res) => {
       const player = user.player;
       if (!player.res) player.res = {};
       if (player.res.元宝 == null) player.res.元宝 = 0;
-      if (!player.blackMarket) player.blackMarket = { holdings: {} };
+      if (!player.blackMarket) player.blackMarket = { holdings: {}, avgCost: {}, trades: [] };
       if (!player.blackMarket.holdings) player.blackMarket.holdings = {};
+      if (!player.blackMarket.avgCost) player.blackMarket.avgCost = {};
+      if (!player.blackMarket.trades) player.blackMarket.trades = [];
 
       const cost = asset.price * amount;
+      const oldQty = player.blackMarket.holdings[assetId] || 0;
+      const oldAvg = player.blackMarket.avgCost[assetId] || asset.price;
 
       if (action === "buy") {
         if ((player.res.绑定元宝 || 0) < cost) {
           return sendError(res, "绑定元宝不足");
         }
 
+        const newQty = oldQty + amount;
+        const newAvg = Math.floor((oldQty * oldAvg + cost) / newQty);
+
         player.res.绑定元宝 -= cost;
-        player.blackMarket.holdings[assetId] = (player.blackMarket.holdings[assetId] || 0) + amount;
+        player.blackMarket.holdings[assetId] = newQty;
+        player.blackMarket.avgCost[assetId] = newAvg;
       }
 
       if (action === "sell") {
-        if ((player.blackMarket.holdings[assetId] || 0) < amount) {
+        if (oldQty < amount) {
           return sendError(res, "持有数量不足");
         }
 
-        player.blackMarket.holdings[assetId] -= amount;
+        const newQty = oldQty - amount;
+
+        player.blackMarket.holdings[assetId] = newQty;
         player.res.元宝 = (player.res.元宝 || 0) + cost;
+
+        if (newQty <= 0) {
+          delete player.blackMarket.holdings[assetId];
+          delete player.blackMarket.avgCost[assetId];
+        }
       }
+
+      player.blackMarket.trades.push({
+        id: "trade_" + Date.now() + "_" + Math.random(),
+        assetId,
+        assetName: asset.name,
+        action,
+        amount,
+        price: asset.price,
+        total: cost,
+        time: Date.now()
+      });
+
+      player.blackMarket.trades = player.blackMarket.trades.slice(-80);
 
       savePlayer(acc, player, saveErr => {
         if (saveErr) return sendError(res, "保存交易失败");
@@ -918,13 +1006,14 @@ app.post("/api/black-market/trade", (req, res) => {
         sendOk(res, {
           asset,
           holdings: player.blackMarket.holdings,
+          avgCost: player.blackMarket.avgCost,
+          trades: player.blackMarket.trades.slice(-30).reverse(),
           res: player.res
         });
       });
     });
   });
 });
-
 app.post("/api/black-market/insider", (req, res) => {
   const { acc, pwd, assetId } = req.body || {};
 
