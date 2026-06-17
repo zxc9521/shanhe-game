@@ -70,6 +70,10 @@ h2,h3{color:var(--gold);margin:0 0 12px}.grid{display:grid;gap:12px}.two{grid-te
 @keyframes battleEffectPop{0%{opacity:0;transform:translate(-50%,-50%) scale(.55) rotate(-12deg)}35%{opacity:1;transform:translate(-50%,-50%) scale(1.15) rotate(3deg)}100%{opacity:0;transform:translate(-50%,-50%) scale(1.45) rotate(12deg)}}
 .battle-actions{display:flex;gap:8px;flex-wrap:wrap;align-items:center}
 .battle-skip{background:linear-gradient(#7d3428,#4d1d17);border-color:#ff9a8e}
+.res-icon{width:18px;height:18px;object-fit:contain;vertical-align:-4px;margin-right:4px}
+.building-card{display:grid;grid-template-columns:72px 1fr;gap:12px;align-items:center}
+.building-icon{width:72px;height:72px;border-radius:12px;border:1px solid var(--line);object-fit:cover;background:#100b07}
+.building-info{min-width:0}
 </style>
 </head>
 <body>
@@ -466,8 +470,30 @@ function fetchAnnouncement(){
   })
   .catch(()=>{});
 }
+const resourceIconMap={
+ 粮草:"food.png",
+ 木材:"wood.png",
+ 石料:"stone.png",
+ 铁矿:"iron.png",
+ 铜钱:"coin.png",
+ 绑定元宝:"gold.png",
+ 招募令:"ticket.png",
+ 限定招募令:"limited_ticket.png",
+ 将魂:"soul.png",
+ 战法残卷:"tactic_scroll.png",
+ 赛季功勋:"merit.png",
+ 强者令:"strong_token.png"
+};
+
+function resourceIcon(name){
+ let file=resourceIconMap[name];
+ if(!file)return "";
+ return `<img class="res-icon" src="./assets/images/resources/${file}" onerror="this.style.display='none'">`;
+}
 function renderAll(){pinfo.textContent=`用户名：${p().name}｜账号：${p().a}｜未读邮件 ${unreadMailCount()} 封`;renderRes();renderLogs();renderPage()}
-function renderRes(){resbar.innerHTML=Object.entries(p().res).map(([k,v])=>`<span class="res">${k}：${Math.floor(v)}</span>`).join("")}
+function renderRes(){
+ resbar.innerHTML=Object.entries(p().res).map(([k,v])=>`<span class="res">${resourceIcon(k)}${k}：${Math.floor(v)}</span>`).join("");
+}
 function renderLogs(){logs.innerHTML=p().logs.map(x=>`<div>${x}</div>`).join("")}
 function show(x){
  page=x;
@@ -477,13 +503,33 @@ function show(x){
  if(x==="chat")startChatPolling();
 }
 function renderPage(){({home:renderHome,map:renderMap,barracks:renderBarracks,teams:renderTeams,battle:renderBattle,battleScene:renderBattleScene,dungeon:renderDungeon,heroes:renderHeroes,recruit:renderRecruit,events:renderEvents,bag:renderBag,farm:renderFarm,market:renderMarket,cook:renderCook,alliance:renderAlliance,chat:renderChat}[page]||renderHome)();renderRes()}
-function costText(c){return Object.entries(c||{}).map(([k,v])=>`${k}×${v}`).join("，")}
+function costText(c){
+ return Object.entries(c||{}).map(([k,v])=>`${resourceIcon(k)}${k}×${v}`).join("，");
+}
 function rewardText(r){let arr=[];if(r.res)arr.push(costText(r.res));if(r.frags)arr.push(Object.entries(r.frags).map(([id,v])=>`${h(Number(id)).name}碎片×${v}`).join("，"));if(r.bag)arr.push(costText(r.bag));return arr.filter(Boolean).join("，")||"无"}
 function rewardToMail(title,reward,content){p().mails.unshift({id:"mail"+now()+Math.random(),title,content:content||"奖励已发放，请领取附件。",reward,claimed:false,time:new Date().toLocaleString()});log(`收到邮件：${title}`);save()}
 function unreadMailCount(){return p().mails.filter(m=>!m.claimed).length}
 function claimMail(id){let m=p().mails.find(x=>x.id===id);if(!m||m.claimed)return;if(m.reward)gainReward(m.reward);m.claimed=true;log(`领取邮件附件：${m.title}`);renderAll()}
 function claimAllMail(){let count=0;for(let m of p().mails){if(!m.claimed){if(m.reward)gainReward(m.reward);m.claimed=true;count++}}log(`一键领取 ${count} 封邮件附件。`);renderAll()}
 
+const buildingIconMap={
+ 官府:"gov.png",
+ 仓库:"warehouse.png",
+ 军营:"barracks.png",
+ 厨房:"kitchen.png",
+ 招贤馆:"tavern.png",
+ 城墙:"wall.png",
+ 耕地:"farmland.png",
+ 林场:"lumberyard.png",
+ 采矿场:"mineyard.png",
+ 坊市:"market.png"
+};
+
+function buildingIcon(name){
+ let file=buildingIconMap[name];
+ if(!file)return "./assets/images/buildings/gov.png";
+ return `./assets/images/buildings/${file}`;
+}
 function buildingData(k,lv){
  let base={
   官府:{cost:{木材:700,石料:700,铁矿:300,铜钱:300},gain:"提高主城阶段和资源产出上限。"},
@@ -596,11 +642,14 @@ function renderHome(){
  for(let [k,lv] of Object.entries(p().buildings)){
   let d=buildingData(k,lv);
 
-  html+=`<div class="stat">
-   <h3>${k} Lv.${lv}</h3>
-   <p class="muted">增益：${d.gain}</p>
-   <p>升级消耗：${costText(d.cost)}</p>
-   <button onclick="upBuild('${k}')">升级</button>
+  html+=`<div class="stat building-card">
+   <img class="building-icon" src="${buildingIcon(k)}" onerror="this.style.display='none'">
+   <div class="building-info">
+    <h3>${k} Lv.${lv}</h3>
+    <p class="muted">增益：${d.gain}</p>
+    <p>升级消耗：${costText(d.cost)}</p>
+    <button onclick="upBuild('${k}')">升级</button>
+   </div>
   </div>`;
  }
 
@@ -614,14 +663,17 @@ function renderHome(){
   let b=p().productionBuildings[name];
   let data=productionBuildingData[name];
 
-  html+=`<div class="stat">
-   <h3>${name} ×${b.count} ｜ Lv.${b.lv}</h3>
-   <p class="muted">${data.gain}</p>
-   <p>产能：${productionPower(name)}</p>
-   <p>新建消耗：${costText(productionBuildCost(name))}</p>
-   <p>升级消耗：${costText(productionUpgradeCost(name))}</p>
-   <button onclick="buildProduction('${name}')">再建一个</button>
-   <button onclick="upgradeProduction('${name}')">升级</button>
+  html+=`<div class="stat building-card">
+   <img class="building-icon" src="${buildingIcon(name)}" onerror="this.style.display='none'">
+   <div class="building-info">
+    <h3>${name} ×${b.count} ｜ Lv.${b.lv}</h3>
+    <p class="muted">${data.gain}</p>
+    <p>产能：${productionPower(name)}</p>
+    <p>新建消耗：${costText(productionBuildCost(name))}</p>
+    <p>升级消耗：${costText(productionUpgradeCost(name))}</p>
+    <button onclick="buildProduction('${name}')">再建一个</button>
+    <button onclick="upgradeProduction('${name}')">升级</button>
+   </div>
   </div>`;
  }
 
