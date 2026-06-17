@@ -19,7 +19,7 @@ input,select{width:100%;padding:9px;border:1px solid var(--line);border-radius:8
 .content,.side{padding:14px;overflow:auto}.side{background:rgba(25,17,11,.92);border-left:1px solid var(--line)}
 h2,h3{color:var(--gold);margin:0 0 12px}.grid{display:grid;gap:12px}.two{grid-template-columns:repeat(2,minmax(0,1fr))}.three{grid-template-columns:repeat(3,minmax(0,1fr))}.list{display:grid;gap:8px}.row{display:flex;gap:8px;flex-wrap:wrap;align-items:center}.hr{border:0;border-top:1px solid var(--line);margin:16px 0}
 .log{height:260px;overflow:auto;background:#100b07;border:1px solid var(--line);border-radius:10px;padding:10px;font-size:13px;line-height:1.6}
-.map{display:grid;grid-template-columns:repeat(5,86px);grid-auto-rows:86px;gap:6px;background:#0e0906;border:1px solid var(--line);border-radius:14px;padding:10px;width:max-content;max-width:100%}.mapbox{display:grid;place-items:center}
+.map{display:grid;grid-template-columns:repeat(5,118px);grid-auto-rows:118px;gap:8px;background:#0e0906;border:1px solid var(--line);border-radius:14px;padding:12px;width:max-content;max-width:100%}gap:6px;background:#0e0906;border:1px solid var(--line);border-radius:14px;padding:10px;width:max-content;max-width:100%}.mapbox{display:grid;place-items:center}
 .tile{border:1px solid rgba(255,255,255,.15);border-radius:10px;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:2px;cursor:pointer;user-select:none;font-size:13px;text-align:center}.tile:hover{outline:2px solid var(--gold)}
 .owned{box-shadow:inset 0 0 0 3px #ffe08a}.garrison{box-shadow:inset 0 0 0 3px #74d7ff}.enemy{box-shadow:inset 0 0 0 3px #ff756b}.self{outline:2px solid #7fe37f}.sel{outline:2px solid #fff}
 .resource{background:#315c2f}.fieldTile{background:#75632b}.salt{background:#617e82}.horse{background:#7b5332}.mine{background:#514967}.battlefield{background:#713936}.trade{background:#84602f}.npc{background:#762c2c}.city{background:#67498b}.pass{background:#4d4d4d}
@@ -45,7 +45,7 @@ h2,h3{color:var(--gold);margin:0 0 12px}.grid{display:grid;gap:12px}.two{grid-te
 .chat-meta{color:var(--mut);font-size:12px}
 .chat-input{display:grid;grid-template-columns:160px 1fr auto;gap:8px;margin-top:10px}
 @media(max-width:1050px){.chat-input{grid-template-columns:1fr}}
-@media(max-width:1050px){.authbox,.main,.two,.three,.event-layout{grid-template-columns:1fr}nav{border-right:0;border-bottom:1px solid var(--line);display:grid;grid-template-columns:repeat(3,1fr);gap:8px}nav button{margin:0;text-align:center}.side{border-left:0;border-top:1px solid var(--line)}header{align-items:flex-start;flex-direction:column}.map{grid-template-columns:repeat(5,64px);grid-auto-rows:64px}.farmgrid{grid-template-columns:repeat(5,60px);grid-auto-rows:60px}}
+@media(max-width:1050px){.authbox,.main,.two,.three,.event-layout{grid-template-columns:1fr}nav{border-right:0;border-bottom:1px solid var(--line);display:grid;grid-template-columns:repeat(3,1fr);gap:8px}nav button{margin:0;text-align:center}.side{border-left:0;border-top:1px solid var(--line)}header{align-items:flex-start;flex-direction:column}.map{grid-template-columns:repeat(5,82px);grid-auto-rows:82px}.farmgrid{grid-template-columns:repeat(5,60px);grid-auto-rows:60px}}
 .battle-scene{display:grid;gap:14px}
 .battle-field{position:relative;min-height:330px;border:1px solid var(--line);border-radius:16px;overflow:hidden;background:linear-gradient(rgba(20,12,6,.55),rgba(20,12,6,.85)),radial-gradient(circle at center,#65401f,#1a1009 70%);display:grid;grid-template-columns:1fr 1fr;align-items:center;padding:22px}
 .battle-unit{position:relative;background:rgba(16,11,7,.78);border:1px solid var(--line);border-radius:16px;padding:14px;text-align:center;transition:transform .18s,filter .18s,box-shadow .18s}
@@ -74,7 +74,9 @@ h2,h3{color:var(--gold);margin:0 0 12px}.grid{display:grid;gap:12px}.two{grid-te
 .building-card{display:grid;grid-template-columns:72px 1fr;gap:12px;align-items:center}
 .building-icon{width:72px;height:72px;border-radius:12px;border:1px solid var(--line);object-fit:cover;background:#100b07}
 .building-info{min-width:0}
-.map-icon{width:30px;height:30px;object-fit:contain;display:block;margin-bottom:2px}
+.map-icon{width:48px;height:48px;object-fit:contain;display:block;margin-bottom:4px}
+.tile{position:relative}
+.tile-owner-avatar{position:absolute;right:5px;top:5px;width:24px;height:24px;border-radius:50%;border:1px solid var(--gold);object-fit:cover;background:#100b07;box-shadow:0 0 8px rgba(0,0,0,.55)}object-fit:contain;display:block;margin-bottom:2px}
 .troop-icon{width:22px;height:22px;object-fit:contain;vertical-align:-6px;margin-right:4px}
 .troop-mini-row{display:flex;gap:2px;flex-wrap:wrap;align-items:center;margin-top:8px}
 .troop-mini{width:18px;height:18px;object-fit:contain}
@@ -127,6 +129,19 @@ h2,h3{color:var(--gold);margin:0 0 12px}.grid{display:grid;gap:12px}.two{grid-te
 .guide-actions{display:flex;gap:8px;flex-wrap:wrap;justify-content:flex-end;margin-top:16px}
 .guide-step{color:var(--mut);font-size:13px;margin-top:10px}
 .guide-glow{outline:3px solid var(--gold)!important;box-shadow:0 0 20px rgba(224,173,79,.55)!important;position:relative;z-index:9999}
+.task-card{display:grid;grid-template-columns:1fr auto;gap:10px;align-items:center}
+.task-progress{height:10px;background:#100b07;border:1px solid var(--line);border-radius:999px;overflow:hidden;margin:8px 0}
+.task-progress-fill{height:100%;background:linear-gradient(90deg,#8b5a24,#e0ad4f);width:0}
+.task-tabs{display:flex;gap:8px;flex-wrap:wrap;margin-bottom:12px}
+.task-tabs button.active{background:linear-gradient(#b1782f,#724219)}
+.player-head{display:flex;align-items:center;gap:10px}
+.player-avatar{width:52px;height:52px;border-radius:12px;border:1px solid var(--gold);object-fit:cover;background:#100b07}
+.avatar-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(92px,1fr));gap:10px}
+.avatar-choice{background:#100b07;border:1px solid var(--line);border-radius:12px;padding:8px;text-align:center;cursor:pointer}
+.avatar-choice:hover{border-color:var(--gold);filter:brightness(1.1)}
+.avatar-choice.active{border-color:var(--gold);box-shadow:0 0 16px rgba(224,173,79,.35)}
+.avatar-choice img{width:64px;height:64px;border-radius:10px;object-fit:cover;background:#100b07;border:1px solid var(--line)}
+.avatar-choice div{font-size:12px;color:var(--mut);margin-top:4px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 </style>
 </head>
 <body>
@@ -156,7 +171,13 @@ h2,h3{color:var(--gold);margin:0 0 12px}.grid{display:grid;gap:12px}.two{grid-te
 <section id="game" class="game hidden">
 <div id="announcementBar" class="announce"></div>
 <header>
-  <div><div class="brand">山河余烬</div><div id="pinfo" class="muted"></div></div>
+  <div class="player-head">
+  <img id="playerAvatar" class="player-avatar" src="./assets/images/avatars/avatar_general_male.png">
+  <div>
+    <div class="brand">山河余烬</div>
+    <div id="pinfo" class="muted"></div>
+  </div>
+</div>
   <div id="resbar" class="resbar"></div>
   <div class="row">
   <button id="bgmBtn" onclick="toggleBgm()">音乐：关</button>
@@ -174,6 +195,7 @@ h2,h3{color:var(--gold);margin:0 0 12px}.grid{display:grid;gap:12px}.two{grid-te
   <button onclick="show('heroes')">武将</button>
   <button onclick="show('recruit')">招募</button>
   <button onclick="show('events')">限时活动</button>
+<button onclick="show('tasks')">每日/周常</button>
   <button onclick="show('bag')">背包</button>
   <button onclick="show('farm')">种地</button>
 <button onclick="show('market')">市场</button>
@@ -186,7 +208,7 @@ h2,h3{color:var(--gold);margin:0 0 12px}.grid{display:grid;gap:12px}.two{grid-te
   <section id="page-home"></section><section id="page-map" class="hidden"></section>
   <section id="page-barracks" class="hidden"></section><section id="page-teams" class="hidden"></section>
   <section id="page-battle" class="hidden"></section><section id="page-battleScene" class="hidden"></section><section id="page-dungeon" class="hidden"></section><section id="page-heroes" class="hidden"></section>
-  <section id="page-recruit" class="hidden"></section><section id="page-events" class="hidden"></section>
+  <section id="page-recruit" class="hidden"></section><section id="page-events" class="hidden"></section><section id="page-tasks" class="hidden"></section>
   <section id="page-bag" class="hidden"></section><section id="page-farm" class="hidden"></section>
 <section id="page-market" class="hidden"></section><section id="page-blackMarket" class="hidden"></section><section id="page-cook" class="hidden"></section><section id="page-alliance" class="hidden"></section>
 <section id="page-chat" class="hidden"></section>
@@ -248,11 +270,13 @@ const KEY="shanhe_v5_html_demo";
 let db={users:{},players:{}};
 let acc=localStorage.getItem("shanhe_v5_acc")||"";
 let pwdCache=localStorage.getItem("shanhe_v5_pwd")||"";
-let page="home", selectedTile="", mapCenter={x:150,y:150}, activeEvent="catchup", worldSize=300;
+let page="home", selectedTile="", mapCenter={x:15,y:15}, activeEvent="catchup", worldSize=30;
 let currentBattle=null;
 let blackMarketState=null;
 let selectedBlackAsset="";
 let blackMarketTimer=null;
+let blackMarketLoading=false;
+let blackMarketLoadedAt=0;
 let battleReturnTimer=null;
 let battleReturnLeft=0;
 let heroFilterStar="all", heroFilterType="all", heroFilterStatus="all", heroSortMode="star";
@@ -416,7 +440,7 @@ function inst(id){return {uid:"h"+now()+Math.random(),id,lv:1,skillLv:1,assigned
 function newPlayer(name,a){
  const starter=heroes.filter(x=>!x.tag&&x.star<=4);
  return {
-  name,a,createdAt:now(),alliance:"",center:{x:150,y:150},seen:{},map:{},selectedTeam:"",worldSize:300,
+name,a,createdAt:now(),alliance:"",avatar:{type:"system",value:"avatar_general_male.png"},center:{x:15,y:15},seen:{},map:{},selectedTeam:"",worldSize:30,
   res:{粮草:15000,木材:10000,石料:10000,铁矿:9000,铜钱:8000,兵源:3500,绑定元宝:1800,元宝:0,招募令:8,限定招募令:3,将魂:0,战法残卷:120,赛季功勋:0,强者令:0},
   buildings:{官府:1,仓库:1,军营:1,厨房:1,招贤馆:1,城墙:1},
 productionBuildings:{
@@ -432,7 +456,7 @@ productionBuildings:{
 blackMarket:{holdings:{}},blackMarketIntro:false,lastProduce:now(),betaGift:false,bag:{传说碎片宝箱:0,五星异世自选箱:0,六星异世自选箱:0},frags:{},
   farm:{exp:0,plots:[{id:"2_2",unlocked:true,crop:"",mature:0}]},
 dungeons:{attempts:{},run:null},
-  recruitLogs:[],mails:[],claimedTasks:{},guide:{done:false,step:0},logs:["进入第一赛季。玄旌禁军将在赛季中期入侵大地图。"],pity6:0,pity7:0,newbie:false
+  recruitLogs:[],mails:[],claimedTasks:{},guide:{done:false,step:0},tasks:{dailyKey:"",weeklyKey:"",daily:{},weekly:{},claimedDaily:{},claimedWeekly:{}},logs:["进入第一赛季。玄旌禁军将在赛季中期入侵大地图。"],pity6:0,pity7:0,newbie:false
  }
 }
 function genMap(){let types=["resource","resource","fieldTile","salt","horse","mine","battlefield","trade","npc","city","pass"],m={};for(let y=0;y<100;y++)for(let x=0;x<100;x++){let d=Math.abs(x-50)+Math.abs(y-50),type=pick(types);if(x===50&&y===50)type="city";m[x+"_"+y]={x,y,type,lv:Math.max(1,Math.ceil(d/18)),owner:x===50&&y===50?"主城":"",garrisonTeam:"",enemy:x>55&&y>55&&Math.random()<.025,res:pick(["粮草","木材","石料","铁矿","铜钱"]),guard:500+Math.ceil(d/10)*450,terrain:pick(["平原","山地","森林","河流","荒漠","古战场"])}}return m}
@@ -444,8 +468,9 @@ function enter(){
  collectProduction(true);
  fetchAnnouncement();
  restoreBgm();
- mapCenter=p().center||{x:150,y:150};
- worldSize=p().worldSize||300;
+preloadBlackMarket();
+ mapCenter=p().center||{x:15,y:15};
+ worldSize=p().worldSize||30;
  loadWorldAround(()=>{
  renderAll();
  show(page);
@@ -474,6 +499,7 @@ function loadWorldAround(done){
 function migratePlayer(){
  let q=p();
  if(!q.mails)q.mails=[];
+if(!q.avatar)q.avatar={type:"system",value:"avatar_general_male.png"};
  if(!q.claimedTasks)q.claimedTasks={};
  if(!q.stats)q.stats={enemyWins:0};
  if(!q.bag)q.bag={};
@@ -488,6 +514,12 @@ if(q.res.元宝==null)q.res.元宝=0;
 if(!q.dungeons)q.dungeons={attempts:{},run:null};
 if(!q.dungeons.attempts)q.dungeons.attempts={};
 if(q.dungeons.run===undefined)q.dungeons.run=null;
+if(!q.tasks)q.tasks={dailyKey:"",weeklyKey:"",daily:{},weekly:{},claimedDaily:{},claimedWeekly:{}};
+if(!q.tasks.daily)q.tasks.daily={};
+if(!q.tasks.weekly)q.tasks.weekly={};
+if(!q.tasks.claimedDaily)q.tasks.claimedDaily={};
+if(!q.tasks.claimedWeekly)q.tasks.claimedWeekly={};
+refreshTaskPeriod(q);
 if(!q.guide)q.guide={done:false,step:0};
 if(q.guide.done==null)q.guide.done=false;
 if(q.guide.step==null)q.guide.step=0;
@@ -705,7 +737,76 @@ function restartGuide(){
  save();
  showGuideStep(0);
 }
-function renderAll(){pinfo.textContent=`用户名：${p().name}｜账号：${p().a}｜未读邮件 ${unreadMailCount()} 封`;renderRes();renderLogs();renderPage()}
+const systemAvatars=[
+ {name:"男将军",file:"avatar_general_male.png"},
+ {name:"女将军",file:"avatar_general_female.png"},
+ {name:"谋士",file:"avatar_scholar.png"},
+ {name:"霸主",file:"avatar_warlord.png"},
+ {name:"农官",file:"avatar_farmer.png"},
+ {name:"商人",file:"avatar_merchant.png"}
+];
+
+function playerAvatarSrc(){
+ let av=p().avatar||{type:"system",value:"avatar_general_male.png"};
+
+ if(av.type==="hero"){
+  let hero=h(Number(av.value));
+  if(hero)return heroAvatar(hero.name);
+ }
+
+ return `./assets/images/avatars/${av.value||"avatar_general_male.png"}`;
+}
+
+function renderPlayerAvatar(){
+ const img=document.getElementById("playerAvatar");
+ if(!img||!acc||!p())return;
+
+ img.src=playerAvatarSrc();
+ img.onerror=()=>{img.src="./assets/images/avatars/avatar_general_male.png"};
+}
+
+function setPlayerAvatar(type,value){
+ p().avatar={type,value};
+ log("已更换玩家头像。");
+ renderAll();
+}
+
+function avatarChoiceClass(type,value){
+ let av=p().avatar||{};
+ return av.type===type&&String(av.value)===String(value)?"avatar-choice active":"avatar-choice";
+}
+
+function renderAvatarPicker(){
+ let systemHtml=systemAvatars.map(a=>`<div class="${avatarChoiceClass("system",a.file)}" onclick="setPlayerAvatar('system','${a.file}')">
+  <img src="./assets/images/avatars/${a.file}" onerror="this.style.display='none'">
+  <div>${a.name}</div>
+ </div>`).join("");
+
+ let heroHtml=p().heroes.map(u=>{
+  let hero=h(u.id);
+  return `<div class="${avatarChoiceClass("hero",hero.id)}" onclick="setPlayerAvatar('hero','${hero.id}')">
+   <img src="${heroAvatar(hero.name)}" onerror="this.src='./assets/images/heroes/default.png'">
+   <div>${hero.name}</div>
+  </div>`;
+ }).join("");
+
+ return `<div class="stat">
+  <h3>更换头像</h3>
+  <p class="muted">可以选择系统头像，也可以使用你已拥有的武将头像。</p>
+  <h3>系统头像</h3>
+  <div class="avatar-grid">${systemHtml}</div>
+  <hr class="hr">
+  <h3>已拥有武将头像</h3>
+  <div class="avatar-grid">${heroHtml||"<div class='muted'>暂无武将头像。</div>"}</div>
+ </div>`;
+}
+function renderAll(){
+ pinfo.textContent=`用户名：${p().name}｜账号：${p().a}｜未读邮件 ${unreadMailCount()} 封`;
+ renderPlayerAvatar();
+ renderRes();
+ renderLogs();
+ renderPage();
+}
 function renderRes(){
  resbar.innerHTML=Object.entries(p().res).map(([k,v])=>`<span class="res">${resourceIcon(k)}${k}：${Math.floor(v)}</span>`).join("");
 }
@@ -717,7 +818,7 @@ function show(x){
  renderPage();
  if(x==="chat")startChatPolling();
 }
-function renderPage(){({home:renderHome,map:renderMap,barracks:renderBarracks,teams:renderTeams,battle:renderBattle,battleScene:renderBattleScene,dungeon:renderDungeon,heroes:renderHeroes,recruit:renderRecruit,events:renderEvents,bag:renderBag,farm:renderFarm,market:renderMarket,blackMarket:renderBlackMarket,cook:renderCook,alliance:renderAlliance,chat:renderChat}[page]||renderHome)();renderRes()}
+function renderPage(){({home:renderHome,map:renderMap,barracks:renderBarracks,teams:renderTeams,battle:renderBattle,battleScene:renderBattleScene,dungeon:renderDungeon,heroes:renderHeroes,recruit:renderRecruit,events:renderEvents,tasks:renderTasks,bag:renderBag,farm:renderFarm,market:renderMarket,blackMarket:renderBlackMarket,cook:renderCook,alliance:renderAlliance,chat:renderChat}[page]||renderHome)();renderRes()}
 function costText(c){
  return Object.entries(c||{}).map(([k,v])=>`${resourceIcon(k)}${k}×${v}`).join("，");
 }
@@ -892,6 +993,7 @@ function renderHome(){
   </div>`;
  }
 
+html+=renderAvatarPicker();
  html+=`</div>
  <hr class="hr">
  <h2>邮箱 ${unreadMailCount()?`<span class="mail-badge">${unreadMailCount()}</span>`:""}</h2>
@@ -1001,6 +1103,23 @@ const mapIconMap={
 };
 
 function mapIcon(type){
+function tileOwnerAvatar(tile){
+ if(!tile||!tile.ownerAvatar)return "";
+
+ let av=tile.ownerAvatar;
+
+ if(av.type==="hero"){
+  let hero=h(Number(av.value));
+  if(hero)return heroAvatar(hero.name);
+ }
+
+ return `./assets/images/avatars/${av.value||"avatar_general_male.png"}`;
+}
+
+function tileOwnerAvatarHtml(tile){
+ if(!tile||!tile.ownerAcc||tile.ownerAcc===acc)return "";
+ return `<img class="tile-owner-avatar" src="${tileOwnerAvatar(tile)}" onerror="this.style.display='none'">`;
+}
  let file=mapIconMap[type]||"resource.png";
  return `./assets/images/map/${file}`;
 }
@@ -1076,10 +1195,21 @@ function renderBossPanel(){
  </div><br>`;
 }
 function renderMap(){revealNear();let html="";for(let y=mapCenter.y-2;y<=mapCenter.y+2;y++)for(let x=mapCenter.x-2;x<=mapCenter.x+2;x++){let t=p().map[x+"_"+y];
-if(!t)continue;html+=`<div onclick="selTile('${x}_${y}')" class="tile ${t.type} ${t.owner===p().name?'owned':''} ${t.garrisonTeam?'garrison':''} ${t.enemy?'enemy':''} ${x===mapCenter.x&&y===mapCenter.y?'self':''} ${selectedTile===x+'_'+y?'sel':''}"><img class="map-icon" src="${mapIcon(t.type)}" onerror="this.style.display='none'"><small>${x},${y}</small><small>${t.enemy?'敌军':t.garrisonTeam?'驻守':'Lv.'+t.lv}</small></div>`}
-document.getElementById("page-map").innerHTML=`${renderBossPanel()}<h2>共享大地图 300×300，当前视野 5×5</h2><div class="stat"><b>${invasionText()}</b><p class="muted">赛季剩余 ${daysLeft()} 天。赛季中期后，${season.invasionName} 会进入地图并占领地块。</p></div><br><div class="row"><button onclick="moveMap(0,-1)">上</button><button onclick="moveMap(-1,0)">左</button><button onclick="moveMap(1,0)">右</button><button onclick="moveMap(0,1)">下</button></div><br><div class="mapbox"><div class="map">${html}</div></div>`}
+if(!t)continue;html+=`<div onclick="selTile('${x}_${y}')" class="tile ${t.type} ${t.owner===p().name?'owned':''} ${t.garrisonTeam?'garrison':''} ${t.enemy?'enemy':''} ${x===mapCenter.x&&y===mapCenter.y?'self':''} ${selectedTile===x+'_'+y?'sel':''}">${tileOwnerAvatarHtml(t)}<img class="map-icon" src="${mapIcon(t.type)}" onerror="this.style.display='none'"><small>${x},${y}</small><small>${t.enemy?'敌军':t.garrisonTeam?'驻守':'Lv.'+t.lv}</small></div>`}
+document.getElementById("page-map").innerHTML=`${renderBossPanel()}<h2>共享大地图 300×300，当前视野 5×5</h2><div class="stat"><b>${invasionText()}</b><p class="muted">赛季剩余 ${daysLeft()} 天。赛季中期后，${season.invasionName} 会进入地图并占领地块。</p></div><br><div class="mapbox"><div class="map">${html}</div></div>`}
 function selTile(id){selectedTile=id;let t=p().map[id];side.innerHTML=`<div class="item"><h3>${tileName(t.type)} ${t.x},${t.y}</h3><p>等级：Lv.${t.lv}</p><p>地形：${t.terrain}</p><p>守军：${t.guard}</p><p>归属：${t.owner||"无"}</p><p>驻守：${t.garrisonTeam?teamName(t.garrisonTeam):"无"}</p><p>敌军：${t.enemy?"有":"无"}</p><select id="mapTeam">${p().teams.map(tm=>`<option value="${tm.id}">${tm.name}｜${teamPower(tm)}</option>`).join("")}</select><br><br><button onclick="marchOccupy('${id}')">派军队占领/进攻</button> <button onclick="scout('${id}')">侦查</button> <button onclick="withdrawGarrison('${id}')">撤回驻守</button></div>`;renderMap()}
 function scout(id){let t=p().map[id];if(!spend({粮草:80}))return;log(`侦查：${tileName(t.type)} Lv.${t.lv} 守军约${t.guard} 地形${t.terrain} 归属${t.owner||"无"}`);renderAll()}
+function hasAdjacentOwnedTile(tile){
+ if(!tile)return false;
+
+ let ownedTiles=Object.values(p().map).filter(t=>t.owner===p().name);
+
+ if(!ownedTiles.length){
+  return Math.abs(tile.x-mapCenter.x)+Math.abs(tile.y-mapCenter.y)<=1;
+ }
+
+ return ownedTiles.some(t=>Math.abs(t.x-tile.x)+Math.abs(t.y-tile.y)<=1);
+}
 function marchOccupy(id){
  let team=p().teams.find(x=>x.id===mapTeam.value);
  if(!team)return alert("请先在军队页编队");
@@ -1088,9 +1218,13 @@ function marchOccupy(id){
  if(!t)return alert("地块数据未加载，请稍后再试");
 
  if(team.total<50)return alert("该队兵力不足50");
- if(team.status!=="空闲")return alert("该队不是空闲状态");
+if(team.status!=="空闲")return alert("该队不是空闲状态");
 
- startBattleScene(team,t,id);
+if(t.owner!==p().name&&!hasAdjacentOwnedTile(t)){
+ return alert("只能占领与你已有地块相邻的土地，请一步一步向外拓张。");
+}
+
+startBattleScene(team,t,id);
 }
 function withdrawGarrison(id){
  let t=p().map[id];
@@ -1115,7 +1249,16 @@ function applyTeamLoss(team,loss){let left=loss;for(let k of Object.keys(team.tr
 
 function unlockedTroops(){let lv=p().buildings.军营;return Object.keys(troopTypes).filter(k=>lv>=troopTypes[k].unlock)}
 function renderBarracks(){let rows=Object.entries(troopTypes).map(([name,d])=>{let unlocked=p().buildings.军营>=d.unlock;return `<tr><td>${troopLabel(name)}</td><td>${unlocked?"已解锁":"军营Lv."+d.unlock}</td><td>${p().troopStock[name]||0}</td><td>${d.baseAtk}/${d.baseDef}/${d.baseSpeed}</td><td>克${d.counter}，弱${d.weak}</td><td>${costText(d.cost)}</td><td><button ${unlocked?"":"disabled"} onclick="train('${name}')">征50人</button></td></tr>`}).join("");document.getElementById("page-barracks").innerHTML=`<h2>征兵</h2><p class="muted">升级军营可以解锁更多兵种。每次征兵以 50 人为单位。</p><table class="table"><tr><th>兵种</th><th>解锁</th><th>库存</th><th>攻/防/速</th><th>克制</th><th>50人消耗</th><th>操作</th></tr>${rows}</table>`}
-function train(name){let d=troopTypes[name];if(!spend(d.cost))return;p().troopStock[name]=(p().troopStock[name]||0)+50;log(`征募${name} 50人。`);renderAll()}
+function train(name){
+ let d=troopTypes[name];
+ if(!spend(d.cost))return;
+
+ p().troopStock[name]=(p().troopStock[name]||0)+50;
+ addTaskProgress("train",1);
+
+ log(`征募${name} 50人。`);
+ renderAll();
+}
 
 function renderTeams(){let availableHeroes=p().heroes.filter(u=>!u.assignedTeam);let options=availableHeroes.map(u=>`<option value="${u.uid}">${h(u.id).name} Lv.${u.lv}</option>`).join("");let troopInputs=Object.keys(troopTypes).map(k=>`<div class="field"><label>${troopLabel(k)}，库存${p().troopStock[k]||0}</label><input id="team_${k}" type="number" min="0" step="50" value="0"></div>`).join("");document.getElementById("page-teams").innerHTML=`<h2>军队</h2><div class="grid two"><div class="stat"><h3>创建编队</h3><p class="muted">每个队伍必须有武将带领，至少 50 兵。军队名自动为 1队、2队、3队。</p><select id="teamHero">${options}</select><br><br>${troopInputs}<button onclick="createTeam()">创建队伍</button></div><div class="stat"><h3>兵种克制</h3><p>步兵克弓兵，弓兵克骑兵，骑兵克步兵，枪兵克骑兵，器械克城防。</p><p class="muted">武将战法只作用于本队。占领地块后，该队会变成驻守状态。</p></div></div><hr class="hr"><h2>已有军队</h2><div class="list">${p().teams.map(teamCard).join("")||"<div class='item muted'>暂无队伍。</div>"}</div>`}
 function teamCard(tm){
@@ -1576,20 +1719,25 @@ function finishBattleScene(result){
   if(b.wasEnemy)p().stats.enemyWins++;
 
   tile.owner=p().name;
-  tile.enemy=false;
-  tile.garrisonTeam=team.id;
+tile.ownerAcc=acc;
+tile.ownerAvatar=p().avatar||{type:"system",value:"avatar_general_male.png"};
+tile.enemy=false;
+tile.garrisonTeam=team.id;
 
   team.status="驻守";
   team.tile=b.tileId;
+mapCenter={x:tile.x,y:tile.y};
+p().center=mapCenter;
 
   gainRes({赛季功勋:tile.lv*10});
 
   fetch("/api/world/occupy",{
    method:"POST",
    headers:{"Content-Type":"application/json"},
-   body:JSON.stringify({acc,pwd:pwdCache,tileId:b.tileId,owner:p().name,garrisonTeam:team.id})
+   body:JSON.stringify({acc,pwd:pwdCache,tileId:b.tileId,owner:p().name,ownerAcc:acc,garrisonTeam:team.id})
   }).catch(()=>{});
 
+addTaskProgress("occupy",1);
   battleLog(`${team.name} 获胜，占领并驻守地块 ${tile.x},${tile.y}。损失兵力 ${loss}。`);
  }else{
   if(team){
@@ -1893,6 +2041,7 @@ function finishDungeon(endingNode){
   <button onclick="backToDungeonList()">返回副本列表</button>
  </div>`;
 
+addTaskProgress("dungeonClear",1);
  log(`通关副本：${d.title}，奖励绑定元宝×${reward}已发邮箱。`);
 
  p().dungeons.run=null;
@@ -2038,6 +2187,142 @@ function drawNormal(){if(!spend({招募令:1}))return;let pool=heroes.filter(x=>
 function drawLimited(gold){if(gold){if(!spend({绑定元宝:180}))return}else if(!spend({限定招募令:1}))return;let pool=heroes.filter(x=>x.tag==="异世武将");let r=Math.random();if(r<.01)addHero(pick(pool.filter(x=>x.star===7)).id,"限定招募");else if(r<.08)addHero(pick(pool.filter(x=>x.star===6)).id,"限定招募");else if(r<.42)addHero(pick(pool.filter(x=>x.star===5)).id,"限定招募");else{let t=pick(pool.filter(x=>x.star<=6));addFrag(t.id,t.star===6?1:3,"限定招募")}renderAll()}
 
 function setEvent(id){activeEvent=id;renderEvents()}
+let activeTaskTab="daily";
+
+function taskDayKey(){
+ return new Date().toISOString().slice(0,10);
+}
+
+function taskWeekKey(){
+ const d=new Date();
+ const oneJan=new Date(d.getFullYear(),0,1);
+ const day=Math.floor((d-oneJan)/86400000);
+ const week=Math.ceil((day+oneJan.getDay()+1)/7);
+ return `${d.getFullYear()}-W${week}`;
+}
+
+function refreshTaskPeriod(q=p()){
+ if(!q.tasks)q.tasks={dailyKey:"",weeklyKey:"",daily:{},weekly:{},claimedDaily:{},claimedWeekly:{}};
+
+ let dayKey=taskDayKey();
+ let weekKey=taskWeekKey();
+
+ if(q.tasks.dailyKey!==dayKey){
+  q.tasks.dailyKey=dayKey;
+  q.tasks.daily={};
+  q.tasks.claimedDaily={};
+ }
+
+ if(q.tasks.weeklyKey!==weekKey){
+  q.tasks.weeklyKey=weekKey;
+  q.tasks.weekly={};
+  q.tasks.claimedWeekly={};
+ }
+}
+
+const dailyTasks=[
+ {key:"train",title:"征兵 3 次",need:3,reward:{res:{粮草:3000,铜钱:1500,兵源:300}}},
+ {key:"occupy",title:"占领 1 块地",need:1,reward:{res:{绑定元宝:300,赛季功勋:30}}},
+ {key:"farmHarvest",title:"收获作物 5 次",need:5,reward:{res:{铜钱:3000,木材:1500}}},
+ {key:"marketSell",title:"市场出售作物 3 次",need:3,reward:{res:{铜钱:5000}}},
+ {key:"blackTrade",title:"完成黑市交易 1 次",need:1,reward:{res:{元宝:300,绑定元宝:300}}},
+ {key:"dungeonClear",title:"通关副本 1 次",need:1,reward:{res:{绑定元宝:1200,招募令:2}}},
+ {key:"chat",title:"发送聊天 1 次",need:1,reward:{res:{铜钱:2000,粮草:2000}}}
+];
+
+const weeklyTasks=[
+ {key:"train",title:"本周征兵 20 次",need:20,reward:{res:{粮草:20000,兵源:2000,招募令:5}}},
+ {key:"occupy",title:"本周占领 10 块地",need:10,reward:{res:{绑定元宝:3000,赛季功勋:300}}},
+ {key:"farmHarvest",title:"本周收获作物 50 次",need:50,reward:{res:{铜钱:30000,木材:10000,石料:10000}}},
+ {key:"marketSell",title:"本周市场出售 20 次",need:20,reward:{res:{铜钱:50000,绑定元宝:1000}}},
+ {key:"blackTrade",title:"本周黑市交易 10 次",need:10,reward:{res:{元宝:1500,绑定元宝:1500}}},
+ {key:"dungeonClear",title:"本周通关副本 10 次",need:10,reward:{res:{绑定元宝:6000,限定招募令:5}}},
+ {key:"chat",title:"本周发送聊天 15 次",need:15,reward:{res:{铜钱:20000,粮草:20000}}}
+];
+
+function addTaskProgress(key,num=1){
+ if(!acc||!p())return;
+
+ refreshTaskPeriod();
+
+ p().tasks.daily[key]=(p().tasks.daily[key]||0)+num;
+ p().tasks.weekly[key]=(p().tasks.weekly[key]||0)+num;
+
+ save();
+
+ if(page==="tasks")renderTasks();
+}
+
+function taskProgress(type,key){
+ refreshTaskPeriod();
+ return type==="daily"?(p().tasks.daily[key]||0):(p().tasks.weekly[key]||0);
+}
+
+function taskClaimed(type,key){
+ return type==="daily"?!!p().tasks.claimedDaily[key]:!!p().tasks.claimedWeekly[key];
+}
+
+function claimTask(type,key){
+ refreshTaskPeriod();
+
+ let list=type==="daily"?dailyTasks:weeklyTasks;
+ let task=list.find(x=>x.key===key);
+ if(!task)return alert("任务不存在");
+
+ let progress=taskProgress(type,key);
+ if(progress<task.need)return alert("任务未完成");
+
+ if(taskClaimed(type,key))return alert("奖励已领取");
+
+ if(type==="daily")p().tasks.claimedDaily[key]=true;
+ else p().tasks.claimedWeekly[key]=true;
+
+ rewardToMail(
+  `${type==="daily"?"每日任务":"周常任务"}：${task.title}`,
+  task.reward,
+  "任务奖励已发放，请领取附件。"
+ );
+
+ renderAll();
+}
+
+function renderTaskList(type){
+ let list=type==="daily"?dailyTasks:weeklyTasks;
+
+ return `<div class="list">${list.map(task=>{
+  let progress=taskProgress(type,task.key);
+  let done=progress>=task.need;
+  let claimed=taskClaimed(type,task.key);
+  let percent=Math.min(100,Math.floor(progress/task.need*100));
+
+  return `<div class="item task-card">
+   <div>
+    <h3>${task.title}</h3>
+    <p class="muted">奖励：${rewardText(task.reward)}</p>
+    <div class="task-progress"><div class="task-progress-fill" style="width:${percent}%"></div></div>
+    <p class="muted">进度：${Math.min(progress,task.need)} / ${task.need}</p>
+   </div>
+   <button ${!done||claimed?"disabled":""} onclick="claimTask('${type}','${task.key}')">${claimed?"已领取":done?"领取":"未完成"}</button>
+  </div>`;
+ }).join("")}</div>`;
+}
+
+function renderTasks(){
+ refreshTaskPeriod();
+
+ document.getElementById("page-tasks").innerHTML=`<h2>每日/周常任务</h2>
+ <p class="muted">完成日常与周常任务可以稳定获得资源。奖励会发到邮箱。</p>
+
+ <div class="task-tabs">
+  <button class="${activeTaskTab==="daily"?"active":""}" onclick="activeTaskTab='daily';renderTasks()">每日任务</button>
+  <button class="${activeTaskTab==="weekly"?"active":""}" onclick="activeTaskTab='weekly';renderTasks()">周常任务</button>
+ </div>
+
+ <div class="stat">
+  <p class="muted">${activeTaskTab==="daily"?`今日任务日期：${p().tasks.dailyKey}`:`本周任务周期：${p().tasks.weeklyKey}`}</p>
+  ${renderTaskList(activeTaskTab)}
+ </div>`;
+}
 function renderEvents(){
  let tabs=[["beta","内测大礼包"],["catchup","新军追赶"],["buildGrow","建筑成长"],["occupyGrow","占地成长"],["farmGrow","种地成长"],["strong","强者降临"],["legend","传说之路"]];
  document.getElementById("page-events").innerHTML=`<h2>限时活动</h2><div class="event-layout"><div class="event-tabs">${tabs.map(t=>`<button class="${activeEvent===t[0]?"active":""}" onclick="setEvent('${t[0]}')">${t[1]}</button>`).join("")}</div><div>${renderEventContent()}</div></div>`;
@@ -2232,6 +2517,7 @@ function clickPlot(id){
 
   p().ingredients[pl.crop]=(p().ingredients[pl.crop]||0)+amt;
   p().farm.exp+=5;
+addTaskProgress("farmHarvest",1);
 
   log(`收获${pl.crop}×${amt}，种地经验+5。`);
 
@@ -2341,6 +2627,7 @@ function harvestAll(){
  }
 
  p().farm.exp+=harvested*5;
+addTaskProgress("farmHarvest",harvested);
 
  log(`一键收获 ${harvested} 块农田，获得：${costText(gains)}，种地经验+${harvested*5}。`);
 
@@ -2415,6 +2702,12 @@ function refreshMarket(force=false){
  save();
 }
 
+function preloadBlackMarket(){
+ if(!acc||!pwdCache)return;
+ if(blackMarketState||blackMarketLoading)return;
+
+ loadBlackMarket(()=>{},true);
+}
 function blackMarketIntro(){
  if(p().blackMarketIntro)return;
 
@@ -2441,18 +2734,29 @@ function blackMarketNextText(){
  return `${m}分${String(s).padStart(2,"0")}秒`;
 }
 
-function loadBlackMarket(done){
+function loadBlackMarket(done,silent=false){
  if(!acc||!pwdCache)return;
+ if(blackMarketLoading)return;
+
+ blackMarketLoading=true;
 
  fetch(`/api/black-market/state?acc=${encodeURIComponent(acc)}&pwd=${encodeURIComponent(pwdCache)}`)
   .then(r=>r.json())
   .then(data=>{
+   blackMarketLoading=false;
+
    if(!data.ok){
-    alert(data.message||"读取黑市失败");
+    if(!silent)alert(data.message||"读取黑市失败");
     return;
    }
 
    blackMarketState=data;
+   blackMarketLoadedAt=now();
+
+   if(!p().blackMarket)p().blackMarket={holdings:{},avgCost:{},trades:[]};
+   p().blackMarket.holdings=data.holdings||{};
+   p().blackMarket.avgCost=data.avgCost||{};
+   p().blackMarket.trades=data.trades||[];
 
    if(!selectedBlackAsset&&data.assets.length){
     selectedBlackAsset=data.assets[0].id;
@@ -2467,75 +2771,10 @@ function loadBlackMarket(done){
 
    if(done)done();
   })
-  .catch(()=>alert("黑市连接失败"));
-}
-
-function blackMarketAssetStats(asset){
- let history=asset.history||[];
- let prev=history[history.length-2]?.price||asset.price;
- let diff=asset.price-prev;
- let percent=prev?diff/prev*100:0;
- let cls=diff>0?"black-up":diff<0?"black-down":"black-flat";
-
- return {
-  diff,
-  percent,
-  cls,
-  text:`${diff>=0?"+":""}${diff}（${percent>=0?"+":""}${percent.toFixed(2)}%）`
- };
-}
-
-function blackMarketProfit(asset){
- let qty=blackMarketHolding(asset.id);
- let avg=blackMarketState?.avgCost?.[asset.id]||0;
-
- if(!qty||!avg){
-  return {profit:0,percent:0,cls:"black-flat",text:"暂无持仓"};
- }
-
- let value=qty*asset.price;
- let cost=qty*avg;
- let profit=value-cost;
- let percent=cost?profit/cost*100:0;
- let cls=profit>0?"black-up":profit<0?"black-down":"black-flat";
-
- return {
-  profit,
-  percent,
-  cls,
-  text:`${profit>=0?"+":""}${profit} 元宝估值差（${percent>=0?"+":""}${percent.toFixed(2)}%）`
- };
-}
-
-function blackMarketNewsHtml(){
- let news=blackMarketState?.news||[];
-
- if(!news.length){
-  return "<div class='muted'>暂无黑市新闻。</div>";
- }
-
- return `<div class="black-news-list">${news.map(n=>`<div class="black-news-item">
-  <b>${escapeHtml(n.title)}</b>
-  <p>${escapeHtml(n.text)}</p>
-  <p class="muted">风向：${escapeHtml(n.mood)}｜预估波动约 ${escapeHtml(n.percent)}%</p>
- </div>`).join("")}</div>`;
-}
-
-function blackMarketTradesHtml(){
- let trades=blackMarketState?.trades||[];
-
- if(!trades.length){
-  return "<div class='muted'>暂无交易记录。</div>";
- }
-
- return `<div class="black-trade-list">${trades.map(t=>{
-  let cls=t.action==="buy"?"black-up":"black-down";
-  return `<div class="black-trade-row">
-   <b class="${cls}">${t.action==="buy"?"买入":"卖出"} ${escapeHtml(t.assetName)}</b>
-   <div>数量：${t.amount}｜价格：${t.price}｜总额：${t.total}</div>
-   <div class="muted">${new Date(t.time).toLocaleString()}</div>
-  </div>`;
- }).join("")}</div>`;
+  .catch(()=>{
+   blackMarketLoading=false;
+   if(!silent)alert("黑市连接失败");
+  });
 }
 function renderBlackMarket(){
  blackMarketIntro();
@@ -2543,12 +2782,15 @@ function renderBlackMarket(){
  const box=document.getElementById("page-blackMarket");
  if(!box)return;
 
- if(!blackMarketState){
-  box.innerHTML=`<h2>黑市</h2><div class="stat">正在连接时空屏幕...</div>`;
+if(!blackMarketState){
+  box.innerHTML=`<h2>黑市</h2><div class="stat">正在连接时空屏幕...<p class="muted">首次加载可能需要几秒，之后会自动缓存。</p></div>`;
   loadBlackMarket(()=>renderBlackMarket());
   return;
  }
 
+if(blackMarketState&&now()-blackMarketLoadedAt>60000&&!blackMarketLoading){
+ loadBlackMarket(()=>{},true);
+}
  let selected=blackMarketState.assets.find(x=>x.id===selectedBlackAsset)||blackMarketState.assets[0];
  if(!selected)return;
 
@@ -2763,9 +3005,15 @@ function blackMarketTrade(action){
    p().res=data.res;
   }
   if(data.holdings)blackMarketState.holdings=data.holdings;
-  if(data.avgCost)blackMarketState.avgCost=data.avgCost;
-  if(data.trades)blackMarketState.trades=data.trades;
+if(data.avgCost)blackMarketState.avgCost=data.avgCost;
+if(data.trades)blackMarketState.trades=data.trades;
 
+if(!p().blackMarket)p().blackMarket={holdings:{},avgCost:{},trades:[]};
+if(data.holdings)p().blackMarket.holdings=data.holdings;
+if(data.avgCost)p().blackMarket.avgCost=data.avgCost;
+if(data.trades)p().blackMarket.trades=data.trades;
+
+addTaskProgress("blackTrade",1);
   log(`黑市${action==="buy"?"买入":"卖出"} ${blackMarketAssetName(selectedBlackAsset)} ×${amount}。`);
 
   loadBlackMarket(()=>renderBlackMarket());
@@ -2782,7 +3030,7 @@ function buyBlackInsider(){
  }).then(r=>r.json()).then(data=>{
   if(!data.ok)return alert(data.message||"购买失败");
 
-  if(p().res.元宝!=null){
+  if(data.yuanbao!=null){
    p().res.元宝=data.yuanbao;
   }
 
@@ -2796,10 +3044,7 @@ function startBlackMarketTimer(){
  if(blackMarketTimer)return;
 
  blackMarketTimer=setInterval(()=>{
-  if(page==="blackMarket"){
-   loadBlackMarket(()=>renderBlackMarket());
-  }
- },30000);
+ },60000);
 }
 function renderMarket(){
  refreshMarket(false);
@@ -2875,6 +3120,7 @@ function sellIngredient(name,num){
 
  gainRes({铜钱:price*num});
 
+addTaskProgress("marketSell",1);
  log(`市场出售${name}×${num}，获得铜钱×${price*num}。`);
 
  renderAll();
@@ -3022,6 +3268,7 @@ function sendChatMessage(){
   chatNextSendAt=Date.now()+3000;
   document.getElementById("chatText").value="";
   if(status)status.textContent="已发送";
+addTaskProgress("chat",1);
   fetchChatMessages();
  }).catch(()=>{
   chatSending=false;

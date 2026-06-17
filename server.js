@@ -5,11 +5,14 @@ const path = require("path");
 const app = express();
 
 const PORT = 80;
-const WORLD_SIZE = 300;
-const SPAWN_MARGIN = 20;
+const WORLD_SIZE = 30;
+const SPAWN_MARGIN = 3;
 const CHAT_COOLDOWN_MS = 3000;
 const BLACK_MARKET_UPDATE_MS = 60 * 60 * 1000;
 const BLACK_MARKET_LIMIT = 0.12;
+const BLACK_MARKET_CACHE_MS = 30 * 1000;
+let blackMarketCache = null;
+let blackMarketCacheAt = 0;
 
 const BLACK_MARKET_ASSETS = [
   { id: "qin_heavy", name: "大秦重工", base: 1000 },
@@ -118,9 +121,14 @@ function initWorld() {
       return;
     }
 
-    if (row.count > 0) {
+        if (row.count === WORLD_SIZE * WORLD_SIZE) {
       console.log(`世界地图已存在：${row.count} 个地块`);
       return;
+    }
+
+    if (row.count > 0 && row.count !== WORLD_SIZE * WORLD_SIZE) {
+      console.log(`检测到旧地图尺寸，正在重建为 ${WORLD_SIZE}×${WORLD_SIZE} 世界地图...`);
+      db.run("DELETE FROM world_tiles");
     }
 
     console.log(`开始生成 ${WORLD_SIZE}×${WORLD_SIZE} 世界地图，请稍等...`);
@@ -130,8 +138,8 @@ function initWorld() {
 
       const stmt = db.prepare(`
         INSERT INTO world_tiles(
-          id, x, y, type, lv, owner, garrisonTeam, enemy, res, guard, terrain
-        ) VALUES(?,?,?,?,?,?,?,?,?,?,?)
+          id, x, y, type, lv, owner, owner_acc, garrisonTeam, enemy, res, guard, terrain
+        ) VALUES(?,?,?,?,?,?,?,?,?,?,?,?)
       `);
 
       for (let y = 0; y < WORLD_SIZE; y++) {
@@ -144,6 +152,7 @@ function initWorld() {
             t.type,
             t.lv,
             t.owner,
+            "",
             t.garrisonTeam,
             t.enemy,
             t.res,
@@ -417,6 +426,27 @@ function ensureBlackMarket(callback) {
     });
   });
 }
+function clearBlackMarketCache() {
+  blackMarketCache = null;
+  blackMarketCacheAt = 0;
+}
+
+function getBlackMarketCached(callback) {
+  const current = Date.now();
+
+  if (blackMarketCache && current - blackMarketCacheAt < BLACK_MARKET_CACHE_MS) {
+    return callback(null, blackMarketCache);
+  }
+
+  ensureBlackMarket((err, assets) => {
+    if (err) return callback(err);
+
+    blackMarketCache = assets;
+    blackMarketCacheAt = Date.now();
+
+    callback(null, assets);
+  });
+}
 function addMailToPlayer(player, title, content, reward) {
   if (!player.mails) player.mails = [];
 
@@ -443,7 +473,7 @@ db.serialize(() => {
     )
   `);
 
-  db.run(`
+    db.run(`
     CREATE TABLE IF NOT EXISTS world_tiles (
       id TEXT PRIMARY KEY,
       x INTEGER NOT NULL,
@@ -451,6 +481,7 @@ db.serialize(() => {
       type TEXT NOT NULL,
       lv INTEGER NOT NULL,
       owner TEXT NOT NULL DEFAULT '',
+      owner_acc TEXT NOT NULL DEFAULT '',
       garrisonTeam TEXT NOT NULL DEFAULT '',
       enemy INTEGER NOT NULL DEFAULT 0,
       res TEXT NOT NULL,
@@ -510,6 +541,13 @@ db.serialize(() => {
     )
   `);
 
+  db.all("PRAGMA table_info(world_tiles)", [], (err, columns) => {
+    if (err) return;
+    const hasOwnerAcc = columns.some(c => c.name === "owner_acc");
+    if (!hasOwnerAcc) {
+      db.run("ALTER TABLE world_tiles ADD COLUMN owner_acc TEXT NOT NULL DEFAULT ''");
+    }
+  });
   initWorld();
 });
 
@@ -555,8 +593,12 @@ app.post("/api/login", (req, res) => {
 
     const player = user.player;
     if (!player.center) player.center = randomSpawn();
-    if (!player.map) player.map = {};
-    player.worldSize = WORLD_SIZE;
+if (player.center.x < 2 || player.center.y < 2 || player.center.x > WORLD_SIZE - 3 || player.center.y > WORLD_SIZE - 3) {
+  player.center = randomSpawn();
+}
+if (!player.map) player.map = {};
+player.map = {};
+player.worldSize = WORLD_SIZE;
 
     sendOk(res, {
       name: user.name,
@@ -615,32 +657,91 @@ app.get("/api/world/tiles", (req, res) => {
     (err, rows) => {
       if (err) return sendError(res, "读取世界地图失败");
 
-      const tiles = {};
+      const ownerAccs = [...new Set(rows.map(r => r.owner_acc).filter(Boolean))];
 
-      for (const row of rows) {
-        tiles[row.id] = {
-          id: row.id,
-          x: row.x,
-          y: row.y,
-          type: row.type,
-          lv: row.lv,
-          owner: row.owner,
-          garrisonTeam: row.garrisonTeam,
-          enemy: !!row.enemy,
-          res: row.res,
-          guard: row.guard,
-          terrain: row.terrain
-        };
+const sendTiles = ownerMap => {
+  const tiles = {};
+
+  for (const row of rows) {
+    const ownerInfo = ownerMap[row.owner_acc] || null;
+
+    tiles[row.id] = {
+      id: row.id,
+      x: row.x,
+      y: row.y,
+      type: row.type,
+      lv: row.lv,
+      owner: row.owner,
+      ownerAcc: row.owner_acc,
+      ownerAvatar: ownerInfo ? ownerInfo.avatar : null,
+      garrisonTeam: row.garrisonTeam,
+      enemy: !!row.enemy,
+      res: row.res,
+      guard: row.guard,
+      terrain: row.terrain
+    };
+  }
+
+  sendOk(res, {
+    worldSize: WORLD_SIZE,
+    tiles
+  });
+};
+
+if (!ownerAccs.length) {
+  sendTiles({});
+  return;
+}
+
+db.all(
+  `SELECT acc, player FROM users WHERE acc IN (${ownerAccs.map(() => "?").join(",")})`,
+  ownerAccs,
+  (userErr, users) => {
+    if (userErr) return sendError(res, "读取占领者头像失败");
+
+    const ownerMap = {};
+
+    for (const userRow of users) {
+      let player = {};
+      try {
+        player = JSON.parse(userRow.player || "{}");
+      } catch (e) {
+        player = {};
       }
 
-      sendOk(res, {
-        worldSize: WORLD_SIZE,
-        tiles
-      });
+      ownerMap[userRow.acc] = {
+        avatar: player.avatar || { type: "system", value: "avatar_general_male.png" }
+      };
+    }
+
+    sendTiles(ownerMap);
+  }
+);
     }
   );
 });
 
+function returnDefeatedGarrison(ownerAcc, teamId, callback) {
+  if (!ownerAcc || !teamId) return callback();
+
+  db.get("SELECT * FROM users WHERE acc = ?", [ownerAcc], (err, row) => {
+    if (err) return callback(err);
+    if (!row) return callback();
+
+    const player = parsePlayer(row);
+
+    if (!player.teams) player.teams = [];
+
+    const team = player.teams.find(t => t.id === teamId);
+
+    if (team) {
+      team.status = "空闲";
+      team.tile = "";
+    }
+
+    savePlayer(ownerAcc, player, callback);
+  });
+}
 app.post("/api/world/occupy", (req, res) => {
   const { acc, pwd, tileId, owner, garrisonTeam } = req.body || {};
 
@@ -653,18 +754,37 @@ app.post("/api/world/occupy", (req, res) => {
     if (!user) return sendError(res, message);
     if (user.banned) return sendError(res, "账号已被封禁");
 
-    db.run(
-      `
-      UPDATE world_tiles
-      SET owner = ?, garrisonTeam = ?, enemy = 0
-      WHERE id = ?
-      `,
-      [owner, garrisonTeam || "", tileId],
-      err2 => {
-        if (err2) return sendError(res, "更新地块失败");
-        sendOk(res);
+    db.get("SELECT * FROM world_tiles WHERE id = ?", [tileId], (tileErr, oldTile) => {
+      if (tileErr) return sendError(res, "读取旧地块失败");
+      if (!oldTile) return sendError(res, "地块不存在");
+
+      const oldOwnerAcc = oldTile.owner_acc || "";
+      const oldGarrisonTeam = oldTile.garrisonTeam || "";
+
+      const updateTile = () => {
+        db.run(
+          `
+          UPDATE world_tiles
+          SET owner = ?, owner_acc = ?, garrisonTeam = ?, enemy = 0
+          WHERE id = ?
+          `,
+          [owner, acc, garrisonTeam || "", tileId],
+          err2 => {
+            if (err2) return sendError(res, "更新地块失败");
+            sendOk(res);
+          }
+        );
+      };
+
+      if (oldOwnerAcc && oldOwnerAcc !== acc && oldGarrisonTeam) {
+        returnDefeatedGarrison(oldOwnerAcc, oldGarrisonTeam, returnErr => {
+          if (returnErr) return sendError(res, "返还被击败驻守队伍失败");
+          updateTile();
+        });
+      } else {
+        updateTile();
       }
-    );
+    });
   });
 });
 
@@ -895,7 +1015,7 @@ app.get("/api/black-market/state", (req, res) => {
     if (!user) return sendError(res, message);
     if (user.banned) return sendError(res, "账号已被封禁");
 
-    ensureBlackMarket((marketErr, assets) => {
+    getBlackMarketCached((marketErr, assets) => {
       if (marketErr) return sendError(res, "读取黑市失败");
 
       const player = user.player;
@@ -940,7 +1060,7 @@ app.post("/api/black-market/trade", (req, res) => {
     if (!user) return sendError(res, message);
     if (user.banned) return sendError(res, "账号已被封禁");
 
-    ensureBlackMarket((marketErr, assets) => {
+    getBlackMarketCached((marketErr, assets) => {
       if (marketErr) return sendError(res, "读取黑市失败");
 
       const asset = assets.find(x => x.id === assetId);
@@ -1003,6 +1123,8 @@ app.post("/api/black-market/trade", (req, res) => {
       savePlayer(acc, player, saveErr => {
         if (saveErr) return sendError(res, "保存交易失败");
 
+        clearBlackMarketCache();
+
         sendOk(res, {
           asset,
           holdings: player.blackMarket.holdings,
@@ -1024,7 +1146,7 @@ app.post("/api/black-market/insider", (req, res) => {
     if (!user) return sendError(res, message);
     if (user.banned) return sendError(res, "账号已被封禁");
 
-    ensureBlackMarket((marketErr, assets) => {
+    getBlackMarketCached((marketErr, assets) => {
       if (marketErr) return sendError(res, "读取黑市失败");
 
       const asset = assets.find(x => x.id === assetId);
