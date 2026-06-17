@@ -80,6 +80,17 @@ h2,h3{color:var(--gold);margin:0 0 12px}.grid{display:grid;gap:12px}.two{grid-te
 .troop-mini{width:18px;height:18px;object-fit:contain}
 .troop-mini-more{font-size:12px;color:var(--mut);margin-left:4px}
 .team-hero-block{display:grid;grid-template-columns:1fr;gap:6px}
+.battle-summary{border:1px solid var(--gold);border-radius:16px;padding:16px;background:rgba(16,11,7,.92);box-shadow:0 0 28px rgba(224,173,79,.22)}
+.battle-summary-art{min-height:190px;border-radius:14px;border:1px solid var(--line);background-size:cover;background-position:center;background-repeat:no-repeat;display:grid;place-items:center;text-align:center;overflow:hidden;margin-bottom:12px}
+.battle-summary-art.victory{background-image:linear-gradient(rgba(20,12,6,.15),rgba(20,12,6,.65)),url("./assets/images/battle/result_victory.png")}
+.battle-summary-art.defeat{background-image:linear-gradient(rgba(20,12,6,.20),rgba(20,12,6,.75)),url("./assets/images/battle/result_defeat.png")}
+.battle-summary-title{font-size:42px;font-weight:900;color:var(--gold);text-shadow:0 3px 10px #000}
+.battle-summary-sub{color:#fff3c4;text-shadow:0 2px 8px #000;margin-top:6px}
+.battle-summary-grid{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:10px;margin:12px 0}
+.battle-summary-stat{background:#100b07;border:1px solid var(--line);border-radius:12px;padding:10px;text-align:center}
+.battle-summary-stat b{display:block;color:var(--gold);font-size:20px;margin-top:4px}
+.battle-countdown{color:var(--mut);font-size:13px}
+@media(max-width:1050px){.battle-summary-grid{grid-template-columns:repeat(2,minmax(0,1fr))}.battle-summary-title{font-size:32px}}
 </style>
 </head>
 <body>
@@ -202,6 +213,8 @@ let acc=localStorage.getItem("shanhe_v5_acc")||"";
 let pwdCache=localStorage.getItem("shanhe_v5_pwd")||"";
 let page="home", selectedTile="", mapCenter={x:150,y:150}, activeEvent="catchup", worldSize=300;
 let currentBattle=null;
+let battleReturnTimer=null;
+let battleReturnLeft=0;
 let heroFilterStar="all", heroFilterType="all", heroFilterStatus="all", heroSortMode="star";
 let activeChat="world", chatTimer=null, chatRendered=false;
 let chatMessages={world:[],alliance:[],private:[]};
@@ -1034,9 +1047,42 @@ function renderBattleScene(){
 
  let b=currentBattle;
 
+ if(b.summary){
+  box.innerHTML=`<h2>战斗结算</h2>
+  <div class="battle-summary">
+   <div class="battle-summary-art ${b.summary.result==="胜利"?"victory":"defeat"}">
+    <div>
+     <div class="battle-summary-title">${b.summary.result==="胜利"?"大获全胜":"战斗失败"}</div>
+     <div class="battle-summary-sub">${b.summary.message}</div>
+    </div>
+   </div>
+
+   <div class="battle-summary-grid">
+    <div class="battle-summary-stat">战斗结果<b>${b.summary.result}</b></div>
+    <div class="battle-summary-stat">损失兵力<b>${b.summary.loss}</b></div>
+    <div class="battle-summary-stat">获得功勋<b>${b.summary.merit}</b></div>
+    <div class="battle-summary-stat">战斗回合<b>${b.round}</b></div>
+   </div>
+
+   <div class="stat">
+    <h3>结算说明</h3>
+    <p>${b.summary.detail}</p>
+    <p class="battle-countdown">${battleReturnLeft>0?`${battleReturnLeft} 秒后自动返回地图。`:"即将返回地图。"}</p>
+    <button onclick="returnFromBattleNow()">立即返回地图</button>
+   </div>
+
+   <br>
+
+   <div class="stat">
+    <h3>完整战报</h3>
+    <div class="battle-log">${b.logs.map(x=>`<div>${x}</div>`).join("")}</div>
+   </div>
+  </div>`;
+  return;
+ }
  box.innerHTML=`<h2>回合制战斗</h2>
  <div class="battle-scene">
-  ${b.result?`<div class="battle-result">${b.result}</div>`:""}
+  ${b.result&&!b.summary?`<div class="battle-result">${b.result}</div>`:""}
 
   <div class="battle-field art-bg" style="background-image:linear-gradient(rgba(20,12,6,.40),rgba(20,12,6,.82)),url('${battleBgByTerrain(b.tileSnapshot.terrain)}')">
    <div class="battle-vs">VS</div>
@@ -1196,6 +1242,45 @@ function skipBattleScene(){
   finishBattleScene("失败");
  }
 }
+function returnFromBattleNow(){
+ if(!currentBattle)return;
+
+ if(battleReturnTimer){
+  clearInterval(battleReturnTimer);
+  battleReturnTimer=null;
+ }
+
+ let returnTileId=currentBattle.tileId;
+ currentBattle=null;
+
+ show("map");
+
+ loadWorldAround(()=>{
+  renderAll();
+  selTile(returnTileId);
+ });
+}
+
+function startBattleReturnCountdown(){
+ if(battleReturnTimer){
+  clearInterval(battleReturnTimer);
+  battleReturnTimer=null;
+ }
+
+ battleReturnLeft=5;
+
+ battleReturnTimer=setInterval(()=>{
+  battleReturnLeft--;
+
+  if(currentBattle){
+   renderBattleScene();
+  }
+
+  if(battleReturnLeft<=0){
+   returnFromBattleNow();
+  }
+ },1000);
+}
 function finishBattleScene(result){
  if(!currentBattle)return;
 
@@ -1208,7 +1293,7 @@ function finishBattleScene(result){
   b.timer=null;
  }
 
- b.result=result==="胜利"?"胜利！正在返回地图...":"失败！正在返回地图...";
+ b.result=result==="胜利"?"胜利":"失败";
 
  let playerLossRate=result==="胜利"?(0.06+Math.random()*0.08):(0.16+Math.random()*0.18);
  let loss=team?Math.ceil(team.total*playerLossRate):0;
@@ -1263,16 +1348,20 @@ function finishBattleScene(result){
  save();
  renderBattleScene();
 
- setTimeout(()=>{
-  let returnTileId=b.tileId;
-  currentBattle=null;
-  show("map");
-  loadWorldAround(()=>{
-   renderAll();
-   selTile(returnTileId);
-  });
- },2500);
-}
+  let merit=result==="胜利"&&tile?tile.lv*10:0;
+
+ b.summary={
+  result,
+  loss,
+  merit,
+  message:result==="胜利"?"我军击溃敌军，成功夺取战场主动权。":"我军进攻受挫，部队已撤回整备。",
+  detail:result==="胜利"&&tile
+   ? `${team?team.name:"我军"} 已占领 ${tileName(tile.type)} ${tile.x},${tile.y}，并进入驻守状态。`
+   : `${team?team.name:"我军"} 未能攻下目标地块，需要补充兵力后再次进攻。`
+ };
+
+ renderBattleScene();
+ startBattleReturnCountdown();
 function renderBattle(){document.getElementById("page-battle").innerHTML=`<h2>战斗页 / 战报</h2><p class="muted">大地图派军队进攻、占领、遭遇入侵军后会在这里生成战报。</p><div class="list">${p().reports.map(r=>`<div class="item"><h3>${r.title}｜${r.result}</h3><p>时间：${r.time}</p><p>我方战力：${r.atk}｜敌方战力：${r.def}｜损失：${r.loss}</p><p class="muted">${r.detail}</p></div>`).join("")||"<div class='item muted'>暂无战报。</div>"}</div>`}
 
 function heroAvatar(name){
