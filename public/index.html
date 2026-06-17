@@ -91,6 +91,17 @@ h2,h3{color:var(--gold);margin:0 0 12px}.grid{display:grid;gap:12px}.two{grid-te
 .battle-summary-stat b{display:block;color:var(--gold);font-size:20px;margin-top:4px}
 .battle-countdown{color:var(--mut);font-size:13px}
 @media(max-width:1050px){.battle-summary-grid{grid-template-columns:repeat(2,minmax(0,1fr))}.battle-summary-title{font-size:32px}}
+.black-layout{display:grid;grid-template-columns:1fr 320px;gap:14px}
+.black-screen{background:radial-gradient(circle at top,#1f2a3b,#07090d 70%);border:1px solid #5d7fa8;border-radius:16px;padding:14px;box-shadow:0 0 26px rgba(80,150,255,.18)}
+.black-chart{width:100%;height:320px;background:#05070a;border:1px solid #26364a;border-radius:12px}
+.black-side{display:grid;gap:12px}
+.black-asset{background:#100b07;border:1px solid var(--line);border-radius:12px;padding:10px;cursor:pointer}
+.black-asset.active{border-color:#74d7ff;box-shadow:0 0 14px rgba(116,215,255,.3)}
+.black-man{display:grid;grid-template-columns:74px 1fr;gap:10px;align-items:center;background:#080608;border:1px solid #3b2b47;border-radius:14px;padding:12px}
+.black-man-face{width:74px;height:74px;border-radius:12px;background:linear-gradient(#1b1b24,#050507);border:1px solid #6e5b87;display:grid;place-items:center;font-size:38px}
+.black-news{background:#080608;border:1px solid #3b2b47;border-radius:12px;padding:10px;line-height:1.7}
+.black-trade{display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px;margin-top:10px}
+@media(max-width:1050px){.black-layout{grid-template-columns:1fr}.black-trade{grid-template-columns:1fr}}
 </style>
 </head>
 <body>
@@ -141,6 +152,7 @@ h2,h3{color:var(--gold);margin:0 0 12px}.grid{display:grid;gap:12px}.two{grid-te
   <button onclick="show('bag')">背包</button>
   <button onclick="show('farm')">种地</button>
 <button onclick="show('market')">市场</button>
+<button onclick="show('blackMarket')">黑市</button>
   <button onclick="show('cook')">厨房</button>
   <button onclick="show('alliance')">同盟</button>
 <button onclick="show('chat')">聊天</button>
@@ -151,7 +163,7 @@ h2,h3{color:var(--gold);margin:0 0 12px}.grid{display:grid;gap:12px}.two{grid-te
   <section id="page-battle" class="hidden"></section><section id="page-battleScene" class="hidden"></section><section id="page-dungeon" class="hidden"></section><section id="page-heroes" class="hidden"></section>
   <section id="page-recruit" class="hidden"></section><section id="page-events" class="hidden"></section>
   <section id="page-bag" class="hidden"></section><section id="page-farm" class="hidden"></section>
-<section id="page-market" class="hidden"></section><section id="page-cook" class="hidden"></section><section id="page-alliance" class="hidden"></section>
+<section id="page-market" class="hidden"></section><section id="page-blackMarket" class="hidden"></section><section id="page-cook" class="hidden"></section><section id="page-alliance" class="hidden"></section>
 <section id="page-chat" class="hidden"></section>
 </main>
 <aside class="side">
@@ -213,6 +225,9 @@ let acc=localStorage.getItem("shanhe_v5_acc")||"";
 let pwdCache=localStorage.getItem("shanhe_v5_pwd")||"";
 let page="home", selectedTile="", mapCenter={x:150,y:150}, activeEvent="catchup", worldSize=300;
 let currentBattle=null;
+let blackMarketState=null;
+let selectedBlackAsset="";
+let blackMarketTimer=null;
 let battleReturnTimer=null;
 let battleReturnLeft=0;
 let heroFilterStar="all", heroFilterType="all", heroFilterStatus="all", heroSortMode="star";
@@ -364,7 +379,7 @@ function newPlayer(name,a){
  const starter=heroes.filter(x=>!x.tag&&x.star<=4);
  return {
   name,a,createdAt:now(),alliance:"",center:{x:150,y:150},seen:{},map:{},selectedTeam:"",worldSize:300,
-  res:{粮草:15000,木材:10000,石料:10000,铁矿:9000,铜钱:8000,兵源:3500,绑定元宝:1800,招募令:8,限定招募令:3,将魂:0,战法残卷:120,赛季功勋:0,强者令:0},
+  res:{粮草:15000,木材:10000,石料:10000,铁矿:9000,铜钱:8000,兵源:3500,绑定元宝:1800,元宝:0,招募令:8,限定招募令:3,将魂:0,战法残卷:120,赛季功勋:0,强者令:0},
   buildings:{官府:1,仓库:1,军营:1,厨房:1,招贤馆:1,城墙:1},
 productionBuildings:{
  耕地:{count:1,lv:1},
@@ -375,7 +390,8 @@ productionBuildings:{
   heroes:[inst(pick(starter).id),inst(pick(starter).id),inst(pick(starter).id)],
   troopStock:{民兵:100,步兵:100,弓兵:0,枪兵:0,骑兵:0,器械:0},
   teams:[],nextTeamNo:1,reports:[],stats:{enemyWins:0},
-  ingredients:{小麦:3,稻米:3,白菜:2},foods:{},seedBag:{},market:{lastRefresh:0,stock:[]},lastProduce:now(),betaGift:false,bag:{传说碎片宝箱:0,五星异世自选箱:0,六星异世自选箱:0},frags:{},
+  ingredients:{小麦:3,稻米:3,白菜:2},foods:{},seedBag:{},market:{lastRefresh:0,stock:[]},
+blackMarket:{holdings:{}},blackMarketIntro:false,lastProduce:now(),betaGift:false,bag:{传说碎片宝箱:0,五星异世自选箱:0,六星异世自选箱:0},frags:{},
   farm:{exp:0,plots:[{id:"2_2",unlocked:true,crop:"",mature:0}]},
 dungeons:{attempts:{},run:null},
   recruitLogs:[],mails:[],claimedTasks:{},logs:["进入第一赛季。玄旌禁军将在赛季中期入侵大地图。"],pity6:0,pity7:0,newbie:false
@@ -421,6 +437,10 @@ function migratePlayer(){
  if(!q.bag)q.bag={};
  if(!q.seedBag)q.seedBag={};
  if(!q.market)q.market={lastRefresh:0,stock:[]};
+if(!q.blackMarket)q.blackMarket={holdings:{}};
+if(!q.blackMarket.holdings)q.blackMarket.holdings={};
+if(q.blackMarketIntro==null)q.blackMarketIntro=false;
+if(q.res.元宝==null)q.res.元宝=0;
 if(!q.dungeons)q.dungeons={attempts:{},run:null};
 if(!q.dungeons.attempts)q.dungeons.attempts={};
 if(q.dungeons.run===undefined)q.dungeons.run=null;
@@ -496,6 +516,7 @@ const resourceIconMap={
  铁矿:"iron.png",
  铜钱:"coin.png",
  绑定元宝:"gold.png",
+元宝:"gold.png",
  招募令:"ticket.png",
  限定招募令:"limited_ticket.png",
  将魂:"soul.png",
@@ -521,7 +542,7 @@ function show(x){
  renderPage();
  if(x==="chat")startChatPolling();
 }
-function renderPage(){({home:renderHome,map:renderMap,barracks:renderBarracks,teams:renderTeams,battle:renderBattle,battleScene:renderBattleScene,dungeon:renderDungeon,heroes:renderHeroes,recruit:renderRecruit,events:renderEvents,bag:renderBag,farm:renderFarm,market:renderMarket,cook:renderCook,alliance:renderAlliance,chat:renderChat}[page]||renderHome)();renderRes()}
+function renderPage(){({home:renderHome,map:renderMap,barracks:renderBarracks,teams:renderTeams,battle:renderBattle,battleScene:renderBattleScene,dungeon:renderDungeon,heroes:renderHeroes,recruit:renderRecruit,events:renderEvents,bag:renderBag,farm:renderFarm,market:renderMarket,blackMarket:renderBlackMarket,cook:renderCook,alliance:renderAlliance,chat:renderChat}[page]||renderHome)();renderRes()}
 function costText(c){
  return Object.entries(c||{}).map(([k,v])=>`${resourceIcon(k)}${k}×${v}`).join("，");
 }
@@ -2159,6 +2180,246 @@ function refreshMarket(force=false){
  save();
 }
 
+function blackMarketIntro(){
+ if(p().blackMarketIntro)return;
+
+ p().blackMarketIntro=true;
+ save();
+
+ alert("时空忽然一阵扭曲，主城角落出现了一块发光的大屏幕。将军们面面相觑，发现只要投入绑定元宝，就能与屏幕上的神秘产业发生互动。一个黑衣人低声提醒：这里不是市场，是黑市。涨跌无常，消息有真有假，胆子小就别盯太久。");
+}
+
+function blackMarketAssetName(id){
+ const asset=blackMarketState?.assets?.find(x=>x.id===id);
+ return asset?asset.name:id;
+}
+
+function blackMarketHolding(id){
+ return blackMarketState?.holdings?.[id]||0;
+}
+
+function blackMarketNextText(){
+ if(!blackMarketState)return "";
+ let ms=blackMarketState.nextUpdateIn||0;
+ let m=Math.floor(ms/60000);
+ let s=Math.floor((ms%60000)/1000);
+ return `${m}分${String(s).padStart(2,"0")}秒`;
+}
+
+function loadBlackMarket(done){
+ if(!acc||!pwdCache)return;
+
+ fetch(`/api/black-market/state?acc=${encodeURIComponent(acc)}&pwd=${encodeURIComponent(pwdCache)}`)
+  .then(r=>r.json())
+  .then(data=>{
+   if(!data.ok){
+    alert(data.message||"读取黑市失败");
+    return;
+   }
+
+   blackMarketState=data;
+
+   if(!selectedBlackAsset&&data.assets.length){
+    selectedBlackAsset=data.assets[0].id;
+   }
+
+   if(data.res){
+    p().res=data.res;
+   }
+
+   if(done)done();
+  })
+  .catch(()=>alert("黑市连接失败"));
+}
+
+function renderBlackMarket(){
+ blackMarketIntro();
+
+ const box=document.getElementById("page-blackMarket");
+ if(!box)return;
+
+ if(!blackMarketState){
+  box.innerHTML=`<h2>黑市</h2><div class="stat">正在连接时空屏幕...</div>`;
+  loadBlackMarket(()=>renderBlackMarket());
+  return;
+ }
+
+ let selected=blackMarketState.assets.find(x=>x.id===selectedBlackAsset)||blackMarketState.assets[0];
+ if(!selected)return;
+
+ box.innerHTML=`<h2>黑市</h2>
+ <p class="muted">每小时更新一次涨跌。绑定元宝可买入，售出获得元宝。元宝功能类似绑定元宝，后期可用于玩家交易。</p>
+
+ <div class="black-layout">
+  <div class="black-screen">
+   <h3>${selected.name}</h3>
+   <p>当前价格：<b class="gold">${selected.price}</b> 绑定元宝/份｜持有：<b class="gold">${blackMarketHolding(selected.id)}</b> 份</p>
+   <canvas id="blackChart" class="black-chart" width="800" height="320"></canvas>
+
+   <div class="black-trade">
+    <input id="blackAmount" type="number" min="1" value="1">
+    <button onclick="blackMarketTrade('buy')">买入</button>
+    <button onclick="blackMarketTrade('sell')">卖出</button>
+   </div>
+
+   <p class="muted">距离下次涨跌约：${blackMarketNextText()}</p>
+  </div>
+
+  <div class="black-side">
+   <div class="stat">
+    <h3>产业列表</h3>
+    <div class="list">
+     ${blackMarketState.assets.map(a=>{
+      let last=a.history[a.history.length-2]?.price||a.price;
+      let diff=a.price-last;
+      let cls=diff>=0?"ok":"bad";
+      return `<div class="black-asset ${a.id===selected.id?"active":""}" onclick="selectBlackAsset('${a.id}')">
+       <b>${a.name}</b>
+       <p>价格：${a.price}</p>
+       <p class="${cls}">${diff>=0?"上涨":"下跌"} ${Math.abs(diff)}</p>
+       <p class="muted">持有：${blackMarketHolding(a.id)} 份</p>
+      </div>`;
+     }).join("")}
+    </div>
+   </div>
+
+   <div class="black-man">
+    <div class="black-man-face">🕶️</div>
+    <div>
+     <h3>黑衣人</h3>
+     <p class="muted">他声称知道下一轮风向。300元宝一次，70%真消息，30%假消息。</p>
+     <button onclick="buyBlackInsider()">购买内幕消息</button>
+    </div>
+   </div>
+
+   <div id="blackNews" class="black-news muted">黑衣人靠在墙边，似乎在等你开价。</div>
+  </div>
+ </div>`;
+
+ drawBlackChart(selected);
+ startBlackMarketTimer();
+ renderRes();
+}
+
+function selectBlackAsset(id){
+ selectedBlackAsset=id;
+ renderBlackMarket();
+}
+
+function drawBlackChart(asset){
+ const canvas=document.getElementById("blackChart");
+ if(!canvas||!asset)return;
+
+ const ctx=canvas.getContext("2d");
+ const w=canvas.width;
+ const h=canvas.height;
+ const pad=35;
+ const history=asset.history||[];
+
+ ctx.clearRect(0,0,w,h);
+ ctx.fillStyle="#05070a";
+ ctx.fillRect(0,0,w,h);
+
+ ctx.strokeStyle="#1f3148";
+ ctx.lineWidth=1;
+
+ for(let i=0;i<6;i++){
+  let y=pad+(h-pad*2)/5*i;
+  ctx.beginPath();
+  ctx.moveTo(pad,y);
+  ctx.lineTo(w-pad,y);
+  ctx.stroke();
+ }
+
+ if(history.length<2){
+  ctx.fillStyle="#bba17a";
+  ctx.fillText("暂无曲线数据，等待下次刷新。",pad,40);
+  return;
+ }
+
+ let prices=history.map(x=>x.price);
+ let min=Math.min(...prices);
+ let max=Math.max(...prices);
+ if(max===min)max=min+1;
+
+ ctx.strokeStyle="#74d7ff";
+ ctx.lineWidth=3;
+ ctx.beginPath();
+
+ history.forEach((point,i)=>{
+  let x=pad+(w-pad*2)*(i/(history.length-1));
+  let y=h-pad-(h-pad*2)*((point.price-min)/(max-min));
+
+  if(i===0)ctx.moveTo(x,y);
+  else ctx.lineTo(x,y);
+ });
+
+ ctx.stroke();
+
+ ctx.fillStyle="#e0ad4f";
+ ctx.font="16px Microsoft YaHei";
+ ctx.fillText(`最高 ${max}`,pad,22);
+ ctx.fillText(`最低 ${min}`,pad,h-10);
+
+ let last=history[history.length-1];
+ ctx.fillStyle="#9bef9b";
+ ctx.beginPath();
+ let lastX=w-pad;
+ let lastY=h-pad-(h-pad*2)*((last.price-min)/(max-min));
+ ctx.arc(lastX,lastY,5,0,Math.PI*2);
+ ctx.fill();
+}
+
+function blackMarketTrade(action){
+ let amount=Math.floor(Number(document.getElementById("blackAmount")?.value||0));
+ if(!amount||amount<1)return alert("请输入购买/卖出数量");
+
+ fetch("/api/black-market/trade",{
+  method:"POST",
+  headers:{"Content-Type":"application/json"},
+  body:JSON.stringify({acc,pwd:pwdCache,assetId:selectedBlackAsset,action,amount})
+ }).then(r=>r.json()).then(data=>{
+  if(!data.ok)return alert(data.message||"交易失败");
+
+  if(data.res){
+   p().res=data.res;
+  }
+
+  log(`黑市${action==="buy"?"买入":"卖出"} ${blackMarketAssetName(selectedBlackAsset)} ×${amount}。`);
+
+  loadBlackMarket(()=>renderBlackMarket());
+ }).catch(()=>alert("交易连接失败"));
+}
+
+function buyBlackInsider(){
+ if(!confirm("是否花费300元宝购买内幕消息？注意：30%概率是假消息。"))return;
+
+ fetch("/api/black-market/insider",{
+  method:"POST",
+  headers:{"Content-Type":"application/json"},
+  body:JSON.stringify({acc,pwd:pwdCache,assetId:selectedBlackAsset})
+ }).then(r=>r.json()).then(data=>{
+  if(!data.ok)return alert(data.message||"购买失败");
+
+  if(p().res.元宝!=null){
+   p().res.元宝=data.yuanbao;
+  }
+
+  document.getElementById("blackNews").textContent=data.text;
+  log("购买黑市内幕消息。");
+  renderRes();
+ }).catch(()=>alert("黑衣人消失了，交易失败。"));
+}
+
+function startBlackMarketTimer(){
+ if(blackMarketTimer)return;
+
+ blackMarketTimer=setInterval(()=>{
+  if(page==="blackMarket"){
+   loadBlackMarket(()=>renderBlackMarket());
+  }
+ },30000);
+}
 function renderMarket(){
  refreshMarket(false);
 

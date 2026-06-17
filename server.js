@@ -8,6 +8,16 @@ const PORT = 80;
 const WORLD_SIZE = 300;
 const SPAWN_MARGIN = 20;
 const CHAT_COOLDOWN_MS = 3000;
+const BLACK_MARKET_UPDATE_MS = 60 * 60 * 1000;
+const BLACK_MARKET_LIMIT = 0.12;
+
+const BLACK_MARKET_ASSETS = [
+  { id: "qin_heavy", name: "大秦重工", base: 1000 },
+  { id: "donghai_salt", name: "东海制盐", base: 850 },
+  { id: "xuanjing_mine", name: "玄晶矿业", base: 1200 },
+  { id: "silk_road", name: "西域商路", base: 950 },
+  { id: "tianji_workshop", name: "天机工坊", base: 1500 }
+];
 
 const GM_KEY = process.env.GM_KEY || "shanhe-gm-123456";
 
@@ -226,6 +236,135 @@ function normalizeReward(reward) {
   return safe;
 }
 
+function blackMarketRandomMove() {
+  return Number(((Math.random() * 2 - 1) * BLACK_MARKET_LIMIT).toFixed(4));
+}
+
+function blackMarketClampPrice(price) {
+  return Math.max(100, Math.floor(price));
+}
+
+function blackMarketHistoryPush(history, price, time) {
+  const list = Array.isArray(history) ? history : [];
+  list.push({ price, time });
+  return list.slice(-48);
+}
+
+function runBlackMarketOps(ops, callback) {
+  if (!ops.length) return callback();
+
+  let index = 0;
+
+  function next() {
+    if (index >= ops.length) return callback();
+
+    const op = ops[index++];
+    db.run(op.sql, op.params, err => {
+      if (err) return callback(err);
+      next();
+    });
+  }
+
+  next();
+}
+
+function formatBlackMarketRow(row) {
+  let history = [];
+
+  try {
+    history = JSON.parse(row.history || "[]");
+  } catch (e) {
+    history = [];
+  }
+
+  return {
+    id: row.id,
+    name: row.name,
+    price: row.price,
+    lastUpdate: row.last_update,
+    nextMove: row.next_move,
+    history
+  };
+}
+
+function loadBlackMarketRows(callback) {
+  db.all("SELECT * FROM black_market ORDER BY id ASC", [], (err, rows) => {
+    if (err) return callback(err);
+
+    const order = new Map(BLACK_MARKET_ASSETS.map((x, i) => [x.id, i]));
+    rows.sort((a, b) => (order.get(a.id) || 0) - (order.get(b.id) || 0));
+
+    callback(null, rows.map(formatBlackMarketRow));
+  });
+}
+
+function ensureBlackMarket(callback) {
+  db.all("SELECT * FROM black_market", [], (err, rows) => {
+    if (err) return callback(err);
+
+    const nowTime = Date.now();
+    const rowMap = {};
+    const ops = [];
+
+    for (const row of rows) {
+      rowMap[row.id] = row;
+    }
+
+    for (const asset of BLACK_MARKET_ASSETS) {
+      if (!rowMap[asset.id]) {
+        const nextMove = blackMarketRandomMove();
+        const history = blackMarketHistoryPush([], asset.base, nowTime);
+
+        ops.push({
+          sql: `
+            INSERT INTO black_market(id, name, price, last_update, next_move, history)
+            VALUES(?,?,?,?,?,?)
+          `,
+          params: [asset.id, asset.name, asset.base, nowTime, nextMove, JSON.stringify(history)]
+        });
+      }
+    }
+
+    for (const row of rows) {
+      let price = row.price;
+      let lastUpdate = row.last_update;
+      let nextMove = row.next_move;
+      let history = [];
+
+      try {
+        history = JSON.parse(row.history || "[]");
+      } catch (e) {
+        history = [];
+      }
+
+      let changed = false;
+
+      while (nowTime - lastUpdate >= BLACK_MARKET_UPDATE_MS) {
+        price = blackMarketClampPrice(price * (1 + nextMove));
+        lastUpdate += BLACK_MARKET_UPDATE_MS;
+        history = blackMarketHistoryPush(history, price, lastUpdate);
+        nextMove = blackMarketRandomMove();
+        changed = true;
+      }
+
+      if (changed) {
+        ops.push({
+          sql: `
+            UPDATE black_market
+            SET price = ?, last_update = ?, next_move = ?, history = ?
+            WHERE id = ?
+          `,
+          params: [price, lastUpdate, nextMove, JSON.stringify(history), row.id]
+        });
+      }
+    }
+
+    runBlackMarketOps(ops, err2 => {
+      if (err2) return callback(err2);
+      loadBlackMarketRows(callback);
+    });
+  });
+}
 function addMailToPlayer(player, title, content, reward) {
   if (!player.mails) player.mails = [];
 
@@ -300,6 +439,16 @@ db.serialize(() => {
     )
   `);
 
+  db.run(`
+    CREATE TABLE IF NOT EXISTS black_market (
+      id TEXT PRIMARY KEY,
+      name TEXT NOT NULL,
+      price INTEGER NOT NULL,
+      last_update INTEGER NOT NULL,
+      next_move REAL NOT NULL,
+      history TEXT NOT NULL
+    )
+  `);
   db.run(`
     CREATE TABLE IF NOT EXISTS announcements (
       id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -683,6 +832,144 @@ app.post("/api/broadcast", (req, res) => {
         sendOk(res);
       }
     );
+  });
+});
+app.get("/api/black-market/state", (req, res) => {
+  const acc = String(req.query.acc || "");
+  const pwd = String(req.query.pwd || "");
+
+  verifyUser(acc, pwd, (err, user, message) => {
+    if (err) return sendError(res, "数据库错误");
+    if (!user) return sendError(res, message);
+    if (user.banned) return sendError(res, "账号已被封禁");
+
+    ensureBlackMarket((marketErr, assets) => {
+      if (marketErr) return sendError(res, "读取黑市失败");
+
+      const player = user.player;
+      if (!player.res) player.res = {};
+      if (player.res.元宝 == null) player.res.元宝 = 0;
+      if (!player.blackMarket) player.blackMarket = { holdings: {} };
+      if (!player.blackMarket.holdings) player.blackMarket.holdings = {};
+
+      savePlayer(acc, player, saveErr => {
+        if (saveErr) return sendError(res, "保存黑市数据失败");
+
+        sendOk(res, {
+          assets,
+          holdings: player.blackMarket.holdings,
+          yuanbao: player.res.元宝 || 0,
+          boundGold: player.res.绑定元宝 || 0,
+          nextUpdateIn: Math.max(0, BLACK_MARKET_UPDATE_MS - (Date.now() - Math.max(...assets.map(a => a.lastUpdate))))
+        });
+      });
+    });
+  });
+});
+
+app.post("/api/black-market/trade", (req, res) => {
+  const { acc, pwd, assetId, action } = req.body || {};
+  const amount = Math.max(1, Math.min(999999, Math.floor(Number(req.body?.amount || 0))));
+
+  if (!assetId || !["buy", "sell"].includes(action) || !amount) {
+    return sendError(res, "交易参数错误");
+  }
+
+  verifyUser(acc, pwd, (err, user, message) => {
+    if (err) return sendError(res, "数据库错误");
+    if (!user) return sendError(res, message);
+    if (user.banned) return sendError(res, "账号已被封禁");
+
+    ensureBlackMarket((marketErr, assets) => {
+      if (marketErr) return sendError(res, "读取黑市失败");
+
+      const asset = assets.find(x => x.id === assetId);
+      if (!asset) return sendError(res, "产业不存在");
+
+      const player = user.player;
+      if (!player.res) player.res = {};
+      if (player.res.元宝 == null) player.res.元宝 = 0;
+      if (!player.blackMarket) player.blackMarket = { holdings: {} };
+      if (!player.blackMarket.holdings) player.blackMarket.holdings = {};
+
+      const cost = asset.price * amount;
+
+      if (action === "buy") {
+        if ((player.res.绑定元宝 || 0) < cost) {
+          return sendError(res, "绑定元宝不足");
+        }
+
+        player.res.绑定元宝 -= cost;
+        player.blackMarket.holdings[assetId] = (player.blackMarket.holdings[assetId] || 0) + amount;
+      }
+
+      if (action === "sell") {
+        if ((player.blackMarket.holdings[assetId] || 0) < amount) {
+          return sendError(res, "持有数量不足");
+        }
+
+        player.blackMarket.holdings[assetId] -= amount;
+        player.res.元宝 = (player.res.元宝 || 0) + cost;
+      }
+
+      savePlayer(acc, player, saveErr => {
+        if (saveErr) return sendError(res, "保存交易失败");
+
+        sendOk(res, {
+          asset,
+          holdings: player.blackMarket.holdings,
+          res: player.res
+        });
+      });
+    });
+  });
+});
+
+app.post("/api/black-market/insider", (req, res) => {
+  const { acc, pwd, assetId } = req.body || {};
+
+  if (!assetId) return sendError(res, "请选择产业");
+
+  verifyUser(acc, pwd, (err, user, message) => {
+    if (err) return sendError(res, "数据库错误");
+    if (!user) return sendError(res, message);
+    if (user.banned) return sendError(res, "账号已被封禁");
+
+    ensureBlackMarket((marketErr, assets) => {
+      if (marketErr) return sendError(res, "读取黑市失败");
+
+      const asset = assets.find(x => x.id === assetId);
+      if (!asset) return sendError(res, "产业不存在");
+
+      const player = user.player;
+      if (!player.res) player.res = {};
+      if (player.res.元宝 == null) player.res.元宝 = 0;
+
+      if ((player.res.元宝 || 0) < 300) {
+        return sendError(res, "元宝不足，需要300元宝");
+      }
+
+      player.res.元宝 -= 300;
+
+      const truth = Math.random() < 0.7;
+      const realUp = asset.nextMove >= 0;
+      const reportUp = truth ? realUp : !realUp;
+      const percent = Math.abs(asset.nextMove * 100).toFixed(1);
+
+      const text = reportUp
+        ? `黑衣人低声说：我听见风声，${asset.name} 下一轮可能走强，波动约 ${percent}% 左右。${truth ? "这消息听起来很真。" : "但他说话时眼神飘了一下。"}`
+        : `黑衣人压低帽檐：有人在撤，${asset.name} 下一轮可能走弱，波动约 ${percent}% 左右。${truth ? "这消息听起来很真。" : "但他说话时眼神飘了一下。"}`;
+
+      savePlayer(acc, player, saveErr => {
+        if (saveErr) return sendError(res, "保存内幕消息失败");
+
+        sendOk(res, {
+          text,
+          truth,
+          yuanbao: player.res.元宝
+        });
+      });
+    });
   });
 });
 app.get("/api/announcement/current", (req, res) => {
