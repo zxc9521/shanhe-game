@@ -46,6 +46,21 @@ h2,h3{color:var(--gold);margin:0 0 12px}.grid{display:grid;gap:12px}.two{grid-te
 .chat-input{display:grid;grid-template-columns:160px 1fr auto;gap:8px;margin-top:10px}
 @media(max-width:1050px){.chat-input{grid-template-columns:1fr}}
 @media(max-width:1050px){.authbox,.main,.two,.three,.event-layout{grid-template-columns:1fr}nav{border-right:0;border-bottom:1px solid var(--line);display:grid;grid-template-columns:repeat(3,1fr);gap:8px}nav button{margin:0;text-align:center}.side{border-left:0;border-top:1px solid var(--line)}header{align-items:flex-start;flex-direction:column}.map{grid-template-columns:repeat(5,64px);grid-auto-rows:64px}.farmgrid{grid-template-columns:repeat(5,60px);grid-auto-rows:60px}}
+.battle-scene{display:grid;gap:14px}
+.battle-field{position:relative;min-height:330px;border:1px solid var(--line);border-radius:16px;overflow:hidden;background:linear-gradient(rgba(20,12,6,.55),rgba(20,12,6,.85)),radial-gradient(circle at center,#65401f,#1a1009 70%);display:grid;grid-template-columns:1fr 1fr;align-items:center;padding:22px}
+.battle-unit{position:relative;background:rgba(16,11,7,.78);border:1px solid var(--line);border-radius:16px;padding:14px;text-align:center;transition:transform .18s,filter .18s,box-shadow .18s}
+.battle-unit.player{justify-self:start;width:min(360px,100%)}
+.battle-unit.enemy{justify-self:end;width:min(360px,100%)}
+.battle-unit.attack{transform:translateX(18px) scale(1.03);filter:brightness(1.25);box-shadow:0 0 20px rgba(224,173,79,.45)}
+.battle-unit.enemy.attack{transform:translateX(-18px) scale(1.03)}
+.battle-unit.hit{filter:brightness(1.6);box-shadow:0 0 22px rgba(201,90,77,.7)}
+.battle-avatar{width:96px;height:96px;border-radius:14px;border:1px solid var(--gold);object-fit:cover;background:#100b07;margin-bottom:8px}
+.hpbar{height:14px;background:#120b07;border:1px solid var(--line);border-radius:999px;overflow:hidden;margin:8px 0}
+.hpfill{height:100%;background:linear-gradient(90deg,#b9312d,#f0b24d);width:100%;transition:width .25s}
+.battle-vs{position:absolute;left:50%;top:50%;transform:translate(-50%,-50%);font-size:44px;color:var(--gold);font-weight:900;text-shadow:0 0 12px #000}
+.battle-result{font-size:28px;color:var(--gold);text-align:center;margin:8px 0}
+.battle-log{height:230px;overflow:auto;background:#100b07;border:1px solid var(--line);border-radius:12px;padding:10px;font-size:13px;line-height:1.7}
+.battle-log div{border-bottom:1px solid rgba(255,255,255,.06);padding:4px 0}
 </style>
 </head>
 <body>
@@ -103,7 +118,7 @@ h2,h3{color:var(--gold);margin:0 0 12px}.grid{display:grid;gap:12px}.two{grid-te
 <main class="content">
   <section id="page-home"></section><section id="page-map" class="hidden"></section>
   <section id="page-barracks" class="hidden"></section><section id="page-teams" class="hidden"></section>
-  <section id="page-battle" class="hidden"></section><section id="page-dungeon" class="hidden"></section><section id="page-heroes" class="hidden"></section>
+  <section id="page-battle" class="hidden"></section><section id="page-battleScene" class="hidden"></section><section id="page-dungeon" class="hidden"></section><section id="page-heroes" class="hidden"></section>
   <section id="page-recruit" class="hidden"></section><section id="page-events" class="hidden"></section>
   <section id="page-bag" class="hidden"></section><section id="page-farm" class="hidden"></section>
 <section id="page-market" class="hidden"></section><section id="page-cook" class="hidden"></section><section id="page-alliance" class="hidden"></section>
@@ -167,6 +182,7 @@ let db={users:{},players:{}};
 let acc=localStorage.getItem("shanhe_v5_acc")||"";
 let pwdCache=localStorage.getItem("shanhe_v5_pwd")||"";
 let page="home", selectedTile="", mapCenter={x:150,y:150}, activeEvent="catchup", worldSize=300;
+let currentBattle=null;
 let heroFilterStar="all", heroFilterType="all", heroFilterStatus="all", heroSortMode="star";
 let activeChat="world", chatTimer=null, chatRendered=false;
 let chatMessages={world:[],alliance:[],private:[]};
@@ -451,7 +467,7 @@ function show(x){
  renderPage();
  if(x==="chat")startChatPolling();
 }
-function renderPage(){({home:renderHome,map:renderMap,barracks:renderBarracks,teams:renderTeams,battle:renderBattle,dungeon:renderDungeon,heroes:renderHeroes,recruit:renderRecruit,events:renderEvents,bag:renderBag,farm:renderFarm,market:renderMarket,cook:renderCook,alliance:renderAlliance,chat:renderChat}[page]||renderHome)();renderRes()}
+function renderPage(){({home:renderHome,map:renderMap,barracks:renderBarracks,teams:renderTeams,battle:renderBattle,battleScene:renderBattleScene,dungeon:renderDungeon,heroes:renderHeroes,recruit:renderRecruit,events:renderEvents,bag:renderBag,farm:renderFarm,market:renderMarket,cook:renderCook,alliance:renderAlliance,chat:renderChat}[page]||renderHome)();renderRes()}
 function costText(c){return Object.entries(c||{}).map(([k,v])=>`${k}×${v}`).join("，")}
 function rewardText(r){let arr=[];if(r.res)arr.push(costText(r.res));if(r.frags)arr.push(Object.entries(r.frags).map(([id,v])=>`${h(Number(id)).name}碎片×${v}`).join("，"));if(r.bag)arr.push(costText(r.bag));return arr.filter(Boolean).join("，")||"无"}
 function rewardToMail(title,reward,content){p().mails.unshift({id:"mail"+now()+Math.random(),title,content:content||"奖励已发放，请领取附件。",reward,claimed:false,time:new Date().toLocaleString()});log(`收到邮件：${title}`);save()}
@@ -671,22 +687,18 @@ if(!t)continue;html+=`<div onclick="selTile('${x}_${y}')" class="tile ${t.type} 
 document.getElementById("page-map").innerHTML=`<h2>共享大地图 300×300，当前视野 5×5</h2><div class="stat"><b>${invasionText()}</b><p class="muted">赛季剩余 ${daysLeft()} 天。赛季中期后，${season.invasionName} 会进入地图并占领地块。</p></div><br><div class="row"><button onclick="moveMap(0,-1)">上</button><button onclick="moveMap(-1,0)">左</button><button onclick="moveMap(1,0)">右</button><button onclick="moveMap(0,1)">下</button></div><br><div class="mapbox"><div class="map">${html}</div></div>`}
 function selTile(id){selectedTile=id;let t=p().map[id];side.innerHTML=`<div class="item"><h3>${tileName(t.type)} ${t.x},${t.y}</h3><p>等级：Lv.${t.lv}</p><p>地形：${t.terrain}</p><p>守军：${t.guard}</p><p>归属：${t.owner||"无"}</p><p>驻守：${t.garrisonTeam?teamName(t.garrisonTeam):"无"}</p><p>敌军：${t.enemy?"有":"无"}</p><select id="mapTeam">${p().teams.map(tm=>`<option value="${tm.id}">${tm.name}｜${teamPower(tm)}</option>`).join("")}</select><br><br><button onclick="marchOccupy('${id}')">派军队占领/进攻</button> <button onclick="scout('${id}')">侦查</button> <button onclick="withdrawGarrison('${id}')">撤回驻守</button></div>`;renderMap()}
 function scout(id){let t=p().map[id];if(!spend({粮草:80}))return;log(`侦查：${tileName(t.type)} Lv.${t.lv} 守军约${t.guard} 地形${t.terrain} 归属${t.owner||"无"}`);renderAll()}
-function marchOccupy(id){let team=p().teams.find(x=>x.id===mapTeam.value);if(!team)return alert("请先在军队页编队");let t=p().map[id];if(team.total<50)return alert("该队兵力不足50");if(team.status!=="空闲")return alert("该队不是空闲状态");let wasEnemy=t.enemy||t.owner===season.invasionName;let report=resolveTileBattle(team,t);p().reports.unshift(report);p().reports=p().reports.slice(0,80);if(report.result==="胜利"){
- if(wasEnemy)p().stats.enemyWins++;
- t.owner=p().name;
- t.enemy=false;
- t.garrisonTeam=team.id;
- team.status="驻守";
- team.tile=id;
- gainRes({赛季功勋:t.lv*10});
- fetch("/api/world/occupy",{
-  method:"POST",
-  headers:{"Content-Type":"application/json"},
-  body:JSON.stringify({acc,pwd:pwdCache,tileId:id,owner:p().name,garrisonTeam:team.id})
- }).catch(()=>{});
- log(`${team.name}占领并驻守地块 ${t.x},${t.y}`);
+function marchOccupy(id){
+ let team=p().teams.find(x=>x.id===mapTeam.value);
+ if(!team)return alert("请先在军队页编队");
+
+ let t=p().map[id];
+ if(!t)return alert("地块数据未加载，请稍后再试");
+
+ if(team.total<50)return alert("该队兵力不足50");
+ if(team.status!=="空闲")return alert("该队不是空闲状态");
+
+ startBattleScene(team,t,id);
 }
-else{team.status="空闲";team.tile="";log(`${team.name}进攻失败，生成战报。`)}save();renderAll();selTile(id)}
 function withdrawGarrison(id){
  let t=p().map[id];
  if(!t.garrisonTeam)return alert("该地无驻守");
@@ -777,6 +789,289 @@ function changeTeamHero(teamId){
 function createTeam(){let uid=teamHero.value;if(!uid)return alert("没有可用武将");let troops={},total=0;for(let k of Object.keys(troopTypes)){let v=Math.floor(Number(document.getElementById("team_"+k).value||0)/50)*50;if(v<0)v=0;if(v>(p().troopStock[k]||0))return alert(k+"库存不足");troops[k]=v;total+=v}if(total<50)return alert("至少选择50兵");for(let k in troops)p().troopStock[k]-=troops[k];let no=p().nextTeamNo++;let tm={id:"team"+now()+Math.random(),name:no+"队",heroUid:uid,troops,total,status:"空闲",tile:""};p().teams.push(tm);p().heroes.find(u=>u.uid===uid).assignedTeam=tm.id;log(`创建${tm.name}。`);renderAll()}
 function disbandTeam(id){let tm=p().teams.find(x=>x.id===id);if(!tm)return;if(tm.status==="驻守")return alert("驻守中的队伍不能解散，请先在地图撤回");for(let k in tm.troops)p().troopStock[k]=(p().troopStock[k]||0)+tm.troops[k];let hero=p().heroes.find(u=>u.assignedTeam===id);if(hero)hero.assignedTeam="";p().teams=p().teams.filter(x=>x.id!==id);log(`解散${tm.name}，士兵返还库存。`);renderAll()}
 function teamPower(tm){let hero=p().heroes.find(u=>u.uid===tm.heroUid),ht=hero?h(hero.id):null;let hp=ht?(ht.atk*8+ht.def*7+ht.str*7+ht.spd*4+ht.siege*5+hero.lv*ht.star*30+hero.skillLv*ht.star*80):0;let tp=0;for(let [k,v] of Object.entries(tm.troops)){let d=troopTypes[k];tp+=v*(d.baseAtk+d.baseDef+d.baseSpeed)/5}return Math.floor((hp+tp)*(tm.status==="驻守"?1.05:1))}
+function battleHeroAvatar(team){
+ let hero=p().heroes.find(u=>u.uid===team.heroUid);
+ if(!hero)return "./assets/images/heroes/default.png";
+ let ht=h(hero.id);
+ if(typeof heroAvatar==="function")return heroAvatar(ht.name);
+ return `./assets/images/heroes/${encodeURIComponent(ht.name)}.png`;
+}
+
+function enemyAvatarByType(type){
+ if(type==="骑兵")return "./assets/images/battle/enemy_cavalry.png";
+ if(type==="城防")return "./assets/images/battle/enemy_guard.png";
+ return "./assets/images/battle/enemy_bandit.png";
+}
+
+function enemyFromTile(tile){
+ let enemyType=tile.enemy?"骑兵":tile.type==="city"||tile.type==="pass"?"城防":pick(["民兵","步兵","弓兵","枪兵","骑兵"]);
+ let base=tile.guard+(tile.enemy?2500:0);
+ let lv=tile.lv||1;
+
+ return {
+  name:tile.enemy?season.invasionName:(tile.type==="city"||tile.type==="pass"?"城池守军":"野外守军"),
+  type:enemyType,
+  hp:Math.max(400,Math.floor(base)),
+  maxHp:Math.max(400,Math.floor(base)),
+  atk:Math.floor(80+lv*55+base/25),
+  def:Math.floor(40+lv*35+base/40),
+  avatar:enemyAvatarByType(enemyType)
+ };
+}
+
+function playerBattleUnit(team){
+ let power=teamPower(team);
+ let hp=Math.max(500,team.total*10+power*0.45);
+ let atk=Math.max(60,power*0.16);
+ let def=Math.max(30,power*0.08);
+
+ return {
+  name:team.name,
+  type:mainTroop(team),
+  hp:Math.floor(hp),
+  maxHp:Math.floor(hp),
+  atk:Math.floor(atk),
+  def:Math.floor(def),
+  avatar:battleHeroAvatar(team)
+ };
+}
+
+function hpPercent(unit){
+ return Math.max(0,Math.min(100,Math.floor(unit.hp/unit.maxHp*100)));
+}
+
+function battleLog(text){
+ if(!currentBattle)return;
+ currentBattle.logs.push(text);
+ currentBattle.logs=currentBattle.logs.slice(-80);
+ renderBattleScene();
+}
+
+function startBattleScene(team,tile,tileId){
+ let wasEnemy=tile.enemy||tile.owner===season.invasionName;
+
+ currentBattle={
+  tileId,
+  returnPage:page,
+  teamId:team.id,
+  tileSnapshot:{...tile},
+  wasEnemy,
+  player:playerBattleUnit(team),
+  enemy:enemyFromTile(tile),
+  round:1,
+  logs:[],
+  result:"",
+  timer:null,
+  animPlayer:"",
+  animEnemy:""
+ };
+
+ page="battleScene";
+ document.querySelectorAll("main section").forEach(s=>s.classList.add("hidden"));
+ document.getElementById("page-battleScene").classList.remove("hidden");
+
+ battleLog(`遭遇敌军：${currentBattle.enemy.name}，兵种 ${currentBattle.enemy.type}。`);
+ battleLog(`${team.name} 进入战斗，主力兵种 ${mainTroop(team)}。`);
+
+ renderBattleScene();
+
+ currentBattle.timer=setTimeout(battleNextRound,800);
+}
+
+function renderBattleScene(){
+ const box=document.getElementById("page-battleScene");
+ if(!box)return;
+
+ if(!currentBattle){
+  box.innerHTML=`<h2>战斗画面</h2><div class="stat muted">当前没有进行中的战斗。</div>`;
+  return;
+ }
+
+ let b=currentBattle;
+
+ box.innerHTML=`<h2>回合制战斗</h2>
+ <div class="battle-scene">
+  ${b.result?`<div class="battle-result">${b.result}</div>`:""}
+
+  <div class="battle-field">
+   <div class="battle-vs">VS</div>
+
+   <div class="battle-unit player ${b.animPlayer}">
+    <img class="battle-avatar" src="${b.player.avatar}" onerror="this.src='./assets/images/heroes/default.png'">
+    <h3>${b.player.name}</h3>
+    <p class="muted">主力：${b.player.type}｜攻 ${b.player.atk}｜防 ${b.player.def}</p>
+    <div class="hpbar"><div class="hpfill" style="width:${hpPercent(b.player)}%"></div></div>
+    <p>${Math.max(0,Math.floor(b.player.hp))} / ${b.player.maxHp}</p>
+   </div>
+
+   <div class="battle-unit enemy ${b.animEnemy}">
+    <img class="battle-avatar" src="${b.enemy.avatar}" onerror="this.src='./assets/images/heroes/default.png'">
+    <h3>${b.enemy.name}</h3>
+    <p class="muted">兵种：${b.enemy.type}｜攻 ${b.enemy.atk}｜防 ${b.enemy.def}</p>
+    <div class="hpbar"><div class="hpfill" style="width:${hpPercent(b.enemy)}%"></div></div>
+    <p>${Math.max(0,Math.floor(b.enemy.hp))} / ${b.enemy.maxHp}</p>
+   </div>
+  </div>
+
+  <div class="stat">
+   <h3>实时战报</h3>
+   <div id="battleLiveLog" class="battle-log">
+    ${b.logs.map(x=>`<div>${x}</div>`).join("")}
+   </div>
+  </div>
+ </div>`;
+
+ const logBox=document.getElementById("battleLiveLog");
+ if(logBox)logBox.scrollTop=logBox.scrollHeight;
+}
+
+function battleDamage(attacker,defender,attackerType,defenderType){
+ let factor=counterFactor(attackerType,defenderType);
+ let random=0.85+Math.random()*0.3;
+ let raw=attacker.atk*factor*random-defender.def*0.35;
+ let damage=Math.max(30,Math.floor(raw));
+ let crit=Math.random()<0.12;
+
+ if(crit)damage=Math.floor(damage*1.6);
+
+ return {damage,crit,factor};
+}
+
+function battleNextRound(){
+ if(!currentBattle||currentBattle.result)return;
+
+ let b=currentBattle;
+ let team=p().teams.find(x=>x.id===b.teamId);
+
+ if(!team){
+  battleLog("队伍不存在，战斗中止。");
+  finishBattleScene("失败");
+  return;
+ }
+
+ b.animPlayer="attack";
+ b.animEnemy="hit";
+ renderBattleScene();
+
+ setTimeout(()=>{
+  let hit=battleDamage(b.player,b.enemy,b.player.type,b.enemy.type);
+  b.enemy.hp-=hit.damage;
+
+  battleLog(`第 ${b.round} 回合：${b.player.name} 发起攻击，造成 ${hit.damage} 伤害${hit.crit?"，触发暴击":""}${hit.factor>1?"，兵种克制生效":hit.factor<1?"，兵种被克制":""}。`);
+
+  b.animPlayer="";
+  b.animEnemy="";
+  renderBattleScene();
+
+  if(b.enemy.hp<=0){
+   finishBattleScene("胜利");
+   return;
+  }
+
+  setTimeout(()=>{
+   b.animEnemy="attack";
+   b.animPlayer="hit";
+   renderBattleScene();
+
+   setTimeout(()=>{
+    let back=battleDamage(b.enemy,b.player,b.enemy.type,b.player.type);
+    b.player.hp-=back.damage;
+
+    battleLog(`第 ${b.round} 回合：${b.enemy.name} 反击，造成 ${back.damage} 伤害${back.crit?"，触发暴击":""}${back.factor>1?"，敌方克制我方":back.factor<1?"，敌方被克制":""}。`);
+
+    b.animEnemy="";
+    b.animPlayer="";
+    renderBattleScene();
+
+    if(b.player.hp<=0){
+     finishBattleScene("失败");
+     return;
+    }
+
+    b.round++;
+    b.timer=setTimeout(battleNextRound,800);
+   },300);
+  },350);
+ },300);
+}
+
+function finishBattleScene(result){
+ if(!currentBattle)return;
+
+ let b=currentBattle;
+ let team=p().teams.find(x=>x.id===b.teamId);
+ let tile=p().map[b.tileId];
+
+ if(b.timer){
+  clearTimeout(b.timer);
+  b.timer=null;
+ }
+
+ b.result=result==="胜利"?"胜利！正在返回地图...":"失败！正在返回地图...";
+
+ let playerLossRate=result==="胜利"?(0.06+Math.random()*0.08):(0.16+Math.random()*0.18);
+ let loss=team?Math.ceil(team.total*playerLossRate):0;
+
+ if(team){
+  applyTeamLoss(team,loss);
+ }
+
+ let report={
+  id:"r"+now()+Math.random(),
+  time:new Date().toLocaleString(),
+  title:`${team?team.name:"未知队伍"} 进攻 ${tile?tileName(tile.type):"未知地块"} ${tile?tile.x:"?"},${tile?tile.y:"?"}`,
+  result,
+  atk:Math.floor(b.player.maxHp-b.player.hp+b.enemy.maxHp),
+  def:b.enemy.maxHp,
+  loss,
+  enemyType:b.enemy.type,
+  detail:b.logs.join(" ")
+ };
+
+ p().reports.unshift(report);
+ p().reports=p().reports.slice(0,80);
+
+ if(result==="胜利"&&team&&tile){
+  if(b.wasEnemy)p().stats.enemyWins++;
+
+  tile.owner=p().name;
+  tile.enemy=false;
+  tile.garrisonTeam=team.id;
+
+  team.status="驻守";
+  team.tile=b.tileId;
+
+  gainRes({赛季功勋:tile.lv*10});
+
+  fetch("/api/world/occupy",{
+   method:"POST",
+   headers:{"Content-Type":"application/json"},
+   body:JSON.stringify({acc,pwd:pwdCache,tileId:b.tileId,owner:p().name,garrisonTeam:team.id})
+  }).catch(()=>{});
+
+  battleLog(`${team.name} 获胜，占领并驻守地块 ${tile.x},${tile.y}。损失兵力 ${loss}。`);
+ }else{
+  if(team){
+   team.status="空闲";
+   team.tile="";
+  }
+
+  battleLog(`${team?team.name:"队伍"} 战败撤回，损失兵力 ${loss}。`);
+ }
+
+ save();
+ renderBattleScene();
+
+ setTimeout(()=>{
+  let returnTileId=b.tileId;
+  currentBattle=null;
+  show("map");
+  loadWorldAround(()=>{
+   renderAll();
+   selTile(returnTileId);
+  });
+ },2500);
+}
 function renderBattle(){document.getElementById("page-battle").innerHTML=`<h2>战斗页 / 战报</h2><p class="muted">大地图派军队进攻、占领、遭遇入侵军后会在这里生成战报。</p><div class="list">${p().reports.map(r=>`<div class="item"><h3>${r.title}｜${r.result}</h3><p>时间：${r.time}</p><p>我方战力：${r.atk}｜敌方战力：${r.def}｜损失：${r.loss}</p><p class="muted">${r.detail}</p></div>`).join("")||"<div class='item muted'>暂无战报。</div>"}</div>`}
 
 function heroAvatar(name){
