@@ -743,11 +743,11 @@ function returnDefeatedGarrison(ownerAcc, teamId, callback) {
   });
 }
 app.post("/api/world/occupy", (req, res) => {
-  const { acc, pwd, tileId, owner, garrisonTeam } = req.body || {};
+  const { acc, pwd, tileId, garrisonTeam } = req.body || {};
 
-  if (!acc || !pwd || !tileId || !owner) {
-    return sendError(res, "占领信息不完整");
-  }
+  if (!acc || !pwd || !tileId) {
+  return sendError(res, "占领信息不完整");
+}
 
   verifyUser(acc, pwd, (err, user, message) => {
     if (err) return sendError(res, "数据库错误");
@@ -768,7 +768,7 @@ app.post("/api/world/occupy", (req, res) => {
           SET owner = ?, owner_acc = ?, garrisonTeam = ?, enemy = 0
           WHERE id = ?
           `,
-          [owner, acc, garrisonTeam || "", tileId],
+          [user.name, acc, garrisonTeam || "", tileId],
           err2 => {
             if (err2) return sendError(res, "更新地块失败");
             sendOk(res);
@@ -801,13 +801,13 @@ app.post("/api/world/withdraw", (req, res) => {
     if (user.banned) return sendError(res, "账号已被封禁");
 
     db.run(
-      "UPDATE world_tiles SET garrisonTeam = '' WHERE id = ?",
-      [tileId],
-      err2 => {
-        if (err2) return sendError(res, "撤军失败");
-        sendOk(res);
-      }
-    );
+  "UPDATE world_tiles SET garrisonTeam = '' WHERE id = ? AND owner_acc = ?",
+  [tileId, acc],
+  err2 => {
+    if (err2) return sendError(res, "撤军失败");
+    sendOk(res);
+  }
+);
   });
 });
 
