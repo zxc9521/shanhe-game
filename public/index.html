@@ -94,6 +94,19 @@ h2,h3{color:var(--gold);margin:0 0 12px}.grid{display:grid;gap:12px}.two{grid-te
 .battle-summary-stat b{display:block;color:var(--gold);font-size:20px;margin-top:4px}
 .battle-countdown{color:var(--mut);font-size:13px}
 @media(max-width:1050px){.battle-summary-grid{grid-template-columns:repeat(2,minmax(0,1fr))}.battle-summary-title{font-size:32px}}
+.bank-tabs{display:flex;gap:8px;flex-wrap:wrap;margin-bottom:12px}
+.bank-tabs button.active{background:linear-gradient(#b1782f,#724219)}
+.bank-summary{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:10px;margin-bottom:12px}
+.bank-summary-card{background:#100b07;border:1px solid var(--line);border-radius:12px;padding:10px;text-align:center}
+.bank-summary-card b{display:block;color:var(--gold);font-size:20px;margin-top:4px}
+.deposit-card{background:#100b07;border:1px solid var(--line);border-radius:12px;padding:12px}
+.deposit-card.mature{border-color:#9bef9b;box-shadow:0 0 12px rgba(155,239,155,.22)}
+.fund-card{background:#100b07;border:1px solid var(--line);border-radius:12px;padding:12px}
+.fund-up{color:#9bef9b}
+.fund-down{color:#ff9a8e}
+.fund-flat{color:var(--mut)}
+.fund-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:12px}
+@media(max-width:1050px){.bank-summary,.fund-grid{grid-template-columns:1fr}}
 .black-layout{display:grid;grid-template-columns:1fr 320px;gap:14px}
 .black-screen{background:radial-gradient(circle at top,#1f2a3b,#07090d 70%);border:1px solid #5d7fa8;border-radius:16px;padding:14px;box-shadow:0 0 26px rgba(80,150,255,.18)}
 .black-chart{width:100%;height:320px;background:#05070a;border:1px solid #26364a;border-radius:12px}
@@ -211,7 +224,7 @@ h2,h3{color:var(--gold);margin:0 0 12px}.grid{display:grid;gap:12px}.two{grid-te
   <button onclick="show('bag')">背包</button>
   <button onclick="show('farm')">种地</button>
 <button onclick="show('market')">市场</button>
-<button onclick="show('blackMarket')">黑市</button>
+<button onclick="show('bank')">钱庄</button>
   <button onclick="show('cook')">厨房</button>
   <button onclick="show('alliance')">同盟</button>
 <button onclick="show('chat')">聊天</button>
@@ -222,7 +235,7 @@ h2,h3{color:var(--gold);margin:0 0 12px}.grid{display:grid;gap:12px}.two{grid-te
   <section id="page-battle" class="hidden"></section><section id="page-battleScene" class="hidden"></section><section id="page-dungeon" class="hidden"></section><section id="page-heroes" class="hidden"></section>
   <section id="page-recruit" class="hidden"></section><section id="page-events" class="hidden"></section><section id="page-tasks" class="hidden"></section>
   <section id="page-bag" class="hidden"></section><section id="page-farm" class="hidden"></section>
-<section id="page-market" class="hidden"></section><section id="page-blackMarket" class="hidden"></section><section id="page-cook" class="hidden"></section><section id="page-alliance" class="hidden"></section>
+<section id="page-market" class="hidden"></section><section id="page-bank" class="hidden"></section><section id="page-blackMarket" class="hidden"></section><section id="page-cook" class="hidden"></section><section id="page-alliance" class="hidden"></section>
 <section id="page-chat" class="hidden"></section>
 </main>
 <aside class="side">
@@ -292,6 +305,7 @@ let blackMarketLoadedAt=0;
 let battleReturnTimer=null;
 let battleReturnLeft=0;
 let heroFilterStar="all", heroFilterType="all", heroFilterStatus="all", heroSortMode="star";
+let activeBankTab="deposit";
 let activeChat="world", chatTimer=null, chatRendered=false;
 let chatMessages={world:[],alliance:[],private:[]};
 let chatLastId={world:0,alliance:0,private:0};
@@ -465,7 +479,7 @@ productionBuildings:{
   troopStock:{民兵:100,步兵:100,弓兵:0,枪兵:0,骑兵:0,器械:0},
   teams:[],nextTeamNo:1,reports:[],stats:{enemyWins:0},
   ingredients:{小麦:3,稻米:3,白菜:2},foods:{},seedBag:{},market:{lastRefresh:0,stock:[]},
-blackMarket:{holdings:{}},blackMarketIntro:false,lastProduce:now(),betaGift:false,bag:{传说碎片宝箱:0,五星异世自选箱:0,六星异世自选箱:0},frags:{},
+blackMarket:{holdings:{}},bank:{deposits:[],funds:{},fundPrices:{},fundLastUpdate:now(),fundTrades:[]},blackMarketIntro:false,lastProduce:now(),betaGift:false,bag:{传说碎片宝箱:0,五星异世自选箱:0,六星异世自选箱:0},frags:{},
   farm:{exp:0,plots:[{id:"2_2",unlocked:true,crop:"",mature:0}]},
 dungeons:{attempts:{},run:null},
   recruitLogs:[],mails:[],claimedTasks:{},guide:{done:false,step:0},tasks:{dailyKey:"",weeklyKey:"",daily:{},weekly:{},claimedDaily:{},claimedWeekly:{}},logs:["进入第一赛季。玄旌禁军将在赛季中期入侵大地图。"],pity6:0,pity7:0,newbie:false
@@ -521,6 +535,12 @@ if(!q.blackMarket)q.blackMarket={holdings:{},avgCost:{},trades:[]};
 if(!q.blackMarket.holdings)q.blackMarket.holdings={};
 if(!q.blackMarket.avgCost)q.blackMarket.avgCost={};
 if(!q.blackMarket.trades)q.blackMarket.trades=[];
+if(!q.bank)q.bank={deposits:[],funds:{},fundPrices:{},fundLastUpdate:now(),fundTrades:[]};
+if(!q.bank.deposits)q.bank.deposits=[];
+if(!q.bank.funds)q.bank.funds={};
+if(!q.bank.fundPrices)q.bank.fundPrices={};
+if(!q.bank.fundLastUpdate)q.bank.fundLastUpdate=now();
+if(!q.bank.fundTrades)q.bank.fundTrades=[];
 if(q.blackMarketIntro==null)q.blackMarketIntro=false;
 if(q.res.元宝==null)q.res.元宝=0;
 if(!q.dungeons)q.dungeons={attempts:{},run:null};
@@ -926,7 +946,7 @@ function show(x){
  renderPage();
  if(x==="chat")startChatPolling();
 }
-function renderPage(){({home:renderHome,map:renderMap,barracks:renderBarracks,teams:renderTeams,battle:renderBattle,battleScene:renderBattleScene,dungeon:renderDungeon,heroes:renderHeroes,recruit:renderRecruit,events:renderEvents,tasks:renderTasks,bag:renderBag,farm:renderFarm,market:renderMarket,blackMarket:renderBlackMarket,cook:renderCook,alliance:renderAlliance,chat:renderChat}[page]||renderHome)();renderRes()}
+function renderPage(){({home:renderHome,map:renderMap,barracks:renderBarracks,teams:renderTeams,battle:renderBattle,battleScene:renderBattleScene,dungeon:renderDungeon,heroes:renderHeroes,recruit:renderRecruit,events:renderEvents,tasks:renderTasks,bag:renderBag,farm:renderFarm,market:renderMarket,bank:renderBank,blackMarket:renderBlackMarket,cook:renderCook,alliance:renderAlliance,chat:renderChat}[page]||renderHome)();renderRes()}
 function costText(c){
  return Object.entries(c||{}).map(([k,v])=>`${resourceIcon(k)}${k}×${v}`).join("，");
 }
@@ -2829,6 +2849,423 @@ function refreshMarket(force=false){
  save();
 }
 
+const depositProducts=[
+ {id:"current",name:"活期存款",days:0,daily:0.0003,desc:"可随时取出，按实际存放天数计息。日利率 0.03%。"},
+ {id:"fixed7",name:"七日死期",days:7,daily:0.0006,desc:"存满 7 天可取，日利率 0.06%。提前取出没有利息。"},
+ {id:"fixed30",name:"三十日死期",days:30,daily:0.0009,desc:"存满 30 天可取，日利率 0.09%。提前取出没有利息。"},
+ {id:"fixed90",name:"九十日死期",days:90,daily:0.0012,desc:"存满 90 天可取，日利率 0.12%。提前取出没有利息。"}
+];
+
+const fundDefs=[
+ {id:"shanhe_stable",name:"山河稳健债基",base:1000,range:0.004,desc:"低风险基金，涨跌很小，适合保守玩家。"},
+ {id:"grain_supply",name:"九州粮道基金",base:1000,range:0.007,desc:"投资粮草与运输产业，波动较小。"},
+ {id:"forge_industry",name:"铁甲工坊基金",base:1000,range:0.010,desc:"投资铁矿、工坊与军械制造，波动中等。"},
+ {id:"border_growth",name:"边关成长基金",base:1000,range:0.014,desc:"投资边关建设与开荒产业，收益和波动略高。"},
+ {id:"xuanjing_mix",name:"玄晶混合基金",base:1000,range:0.018,desc:"混合型基金，风险高于普通基金，但低于黑市股票。"}
+];
+
+function ensureBank(){
+ if(!p().bank)p().bank={deposits:[],funds:{},fundPrices:{},fundLastUpdate:now(),fundTrades:[]};
+ if(!p().bank.deposits)p().bank.deposits=[];
+ if(!p().bank.funds)p().bank.funds={};
+ if(!p().bank.fundPrices)p().bank.fundPrices={};
+ if(!p().bank.fundLastUpdate)p().bank.fundLastUpdate=now();
+ if(!p().bank.fundTrades)p().bank.fundTrades=[];
+
+ for(let f of fundDefs){
+  if(!p().bank.fundPrices[f.id]){
+   p().bank.fundPrices[f.id]=f.base;
+  }
+ }
+}
+
+function settleFunds(){
+ ensureBank();
+
+ let b=p().bank;
+ let changed=false;
+
+ while(now()-b.fundLastUpdate>=dayMs()){
+  for(let f of fundDefs){
+   let oldPrice=b.fundPrices[f.id]||f.base;
+   let move=(Math.random()*2-1)*f.range;
+   let newPrice=Math.max(100,Math.floor(oldPrice*(1+move)));
+   b.fundPrices[f.id]=newPrice;
+  }
+
+  b.fundLastUpdate+=dayMs();
+  changed=true;
+ }
+
+ if(changed){
+  log("钱庄基金已完成一轮每日净值更新。");
+  save();
+ }
+}
+
+function bankSetTab(tab){
+ activeBankTab=tab;
+ renderBank();
+}
+
+function bankTabButton(tab,name){
+ return `<button class="${activeBankTab===tab?"active":""}" onclick="bankSetTab('${tab}')">${name}</button>`;
+}
+
+function bankTotalDeposit(){
+ ensureBank();
+ return p().bank.deposits.reduce((sum,d)=>sum+(d.amount||0),0);
+}
+
+function bankTotalFundValue(){
+ ensureBank();
+
+ let total=0;
+
+ for(let f of fundDefs){
+  let hold=p().bank.funds[f.id];
+  if(!hold)continue;
+
+  let price=p().bank.fundPrices[f.id]||f.base;
+  total+=hold.units*price;
+ }
+
+ return Math.floor(total);
+}
+
+function renderBank(){
+ ensureBank();
+ settleFunds();
+
+ const box=document.getElementById("page-bank");
+ if(!box)return;
+
+ box.innerHTML=`<h2>钱庄</h2>
+ <p class="muted">钱庄包含三个独立页面：存款、基金、黑市。点击上方按钮切换。</p>
+
+ <div class="bank-tabs">
+  ${bankTabButton("deposit","存款")}
+  ${bankTabButton("fund","基金")}
+  ${bankTabButton("black","黑市")}
+ </div>
+
+ <div class="bank-summary">
+  <div class="bank-summary-card">铜钱余额<b>${Math.floor(p().res.铜钱||0)}</b></div>
+  <div class="bank-summary-card">存款本金<b>${bankTotalDeposit()}</b></div>
+  <div class="bank-summary-card">基金估值<b>${bankTotalFundValue()}</b></div>
+ </div>
+
+ <div id="bankContent"></div>`;
+
+ if(activeBankTab==="deposit"){
+  document.getElementById("bankContent").innerHTML=renderDepositPage();
+ }
+
+ if(activeBankTab==="fund"){
+  document.getElementById("bankContent").innerHTML=renderFundPage();
+ }
+
+ if(activeBankTab==="black"){
+  document.getElementById("bankContent").innerHTML=`<div class="stat muted">正在进入黑市...</div>`;
+  renderBlackMarket();
+ }
+}
+
+function depositProductById(id){
+ return depositProducts.find(x=>x.id===id)||depositProducts[0];
+}
+
+function depositElapsedDays(d){
+ return Math.max(0,(now()-(d.start||now()))/dayMs());
+}
+
+function depositMature(d){
+ if(!d.days)return true;
+ return now()>=d.start+d.days*dayMs();
+}
+
+function depositInterest(d){
+ let product=depositProductById(d.productId);
+ let elapsed=depositElapsedDays(d);
+
+ if(product.days){
+  if(!depositMature(d))return 0;
+  elapsed=product.days;
+ }
+
+ return Math.floor((d.amount||0)*product.daily*elapsed);
+}
+
+function depositRemainText(d){
+ let product=depositProductById(d.productId);
+
+ if(!product.days)return "随时可取";
+
+ let left=d.start+product.days*dayMs()-now();
+
+ if(left<=0)return "已到期";
+
+ let days=Math.ceil(left/dayMs());
+ return `还有 ${days} 天到期`;
+}
+
+function renderDepositPage(){
+ ensureBank();
+
+ let productOptions=depositProducts.map(x=>`
+  <option value="${x.id}">${x.name}｜日利率 ${(x.daily*100).toFixed(3)}%｜${x.days?x.days+"天":"活期"}</option>
+ `).join("");
+
+ let deposits=p().bank.deposits;
+
+ return `<div class="grid two">
+  <div class="stat">
+   <h3>办理存款</h3>
+   <p class="muted">存款使用铜钱。利息按日利率计算。活期可随时取；死期提前取出没有利息。</p>
+
+   <div class="field">
+    <label>选择产品</label>
+    <select id="depositProduct">${productOptions}</select>
+   </div>
+
+   <div class="field">
+    <label>存入铜钱数量</label>
+    <input id="depositAmount" type="number" min="1" value="1000">
+   </div>
+
+   <button onclick="createDeposit()">确认存入</button>
+
+   <hr class="hr">
+
+   <h3>产品说明</h3>
+   <div class="list">
+    ${depositProducts.map(x=>`<div class="item">
+     <b>${x.name}</b>
+     <p class="muted">${x.desc}</p>
+    </div>`).join("")}
+   </div>
+  </div>
+
+  <div class="stat">
+   <h3>我的存款</h3>
+   <div class="list">
+    ${deposits.map(d=>{
+     let product=depositProductById(d.productId);
+     let interest=depositInterest(d);
+     let mature=depositMature(d);
+
+     return `<div class="deposit-card ${mature?"mature":""}">
+      <h3>${product.name}</h3>
+      <p>本金：<b class="gold">${d.amount}</b> 铜钱</p>
+      <p>预计利息：<b class="gold">${interest}</b> 铜钱</p>
+      <p class="muted">状态：${depositRemainText(d)}｜日利率 ${(product.daily*100).toFixed(3)}%</p>
+      <button onclick="withdrawDeposit('${d.id}')">${product.days&&!mature?"提前取出":"取出本息"}</button>
+     </div>`;
+    }).join("")||"<div class='muted'>暂无存款。</div>"}
+   </div>
+  </div>
+ </div>`;
+}
+
+function createDeposit(){
+ ensureBank();
+
+ let productId=document.getElementById("depositProduct")?.value||"current";
+ let amount=Math.floor(Number(document.getElementById("depositAmount")?.value||0));
+
+ if(amount<=0)return alert("请输入正确的存款数量");
+
+ let product=depositProductById(productId);
+
+ if(!spend({铜钱:amount}))return;
+
+ p().bank.deposits.unshift({
+  id:"dep_"+now()+"_"+Math.random(),
+  productId,
+  name:product.name,
+  amount,
+  start:now(),
+  days:product.days,
+  daily:product.daily
+ });
+
+ log(`钱庄存入 ${product.name}，本金铜钱×${amount}。`);
+
+ save();
+ renderAll();
+}
+
+function withdrawDeposit(id){
+ ensureBank();
+
+ let d=p().bank.deposits.find(x=>x.id===id);
+ if(!d)return alert("存款不存在");
+
+ let product=depositProductById(d.productId);
+ let mature=depositMature(d);
+ let interest=depositInterest(d);
+
+ if(product.days&&!mature){
+  if(!confirm("该死期存款尚未到期，提前取出将没有利息。确定取出吗？"))return;
+  interest=0;
+ }
+
+ let total=d.amount+interest;
+
+ p().bank.deposits=p().bank.deposits.filter(x=>x.id!==id);
+ gainRes({铜钱:total});
+
+ log(`钱庄取出 ${product.name}，获得铜钱×${total}，其中利息×${interest}。`);
+
+ save();
+ renderAll();
+}
+
+function fundTrendText(f){
+ ensureBank();
+
+ let current=p().bank.fundPrices[f.id]||f.base;
+ let diff=current-f.base;
+ let pct=f.base?diff/f.base*100:0;
+
+ if(diff>0)return {cls:"fund-up",text:`较初始上涨 +${pct.toFixed(2)}%`};
+ if(diff<0)return {cls:"fund-down",text:`较初始下跌 ${pct.toFixed(2)}%`};
+ return {cls:"fund-flat",text:"暂无涨跌"};
+}
+
+function renderFundPage(){
+ ensureBank();
+
+ let nextLeft=Math.max(0,dayMs()-(now()-p().bank.fundLastUpdate));
+ let nextHours=Math.floor(nextLeft/3600000);
+ let nextMinutes=Math.floor((nextLeft%3600000)/60000);
+
+ return `<div class="stat">
+  <h3>基金</h3>
+  <p class="muted">基金每日更新一次净值。涨跌幅小于黑市，风险和收益都更温和。购买消耗绑定元宝，卖出获得元宝。</p>
+  <p class="muted">距离下次基金净值更新约：${nextHours}小时${nextMinutes}分钟</p>
+ </div>
+
+ <br>
+
+ <div class="fund-grid">
+  ${fundDefs.map(f=>{
+   let price=p().bank.fundPrices[f.id]||f.base;
+   let hold=p().bank.funds[f.id]||{units:0,avg:0};
+   let value=Math.floor(hold.units*price);
+   let cost=Math.floor(hold.units*(hold.avg||0));
+   let profit=value-cost;
+   let trend=fundTrendText(f);
+   let profitCls=profit>0?"fund-up":profit<0?"fund-down":"fund-flat";
+
+   return `<div class="fund-card">
+    <h3>${f.name}</h3>
+    <p class="muted">${f.desc}</p>
+    <p>当前净值：<b class="gold">${price}</b></p>
+    <p class="${trend.cls}">${trend.text}</p>
+    <p>持有份额：<b class="gold">${hold.units?hold.units.toFixed(4):"0.0000"}</b></p>
+    <p>持仓均价：<b class="gold">${hold.avg||"暂无"}</b></p>
+    <p>当前估值：<b class="gold">${value}</b>｜盈亏：<b class="${profitCls}">${profit>=0?"+":""}${profit}</b></p>
+
+    <div class="field">
+     <label>买入金额，消耗绑定元宝</label>
+     <input id="fundBuy_${f.id}" type="number" min="1" value="1000">
+    </div>
+
+    <button onclick="buyFund('${f.id}')">买入</button>
+    <button onclick="sellFund('${f.id}')">全部卖出</button>
+   </div>`;
+  }).join("")}
+ </div>
+
+ <hr class="hr">
+
+ <div class="stat">
+  <h3>基金交易记录</h3>
+  <div class="list">
+   ${p().bank.fundTrades.slice(0,30).map(t=>`<div class="item">
+    <b>${t.action==="buy"?"买入":"卖出"} ${t.name}</b>
+    <p>${t.text}</p>
+    <p class="muted">${t.time}</p>
+   </div>`).join("")||"<div class='muted'>暂无基金交易。</div>"}
+  </div>
+ </div>`;
+}
+
+function fundById(id){
+ return fundDefs.find(x=>x.id===id);
+}
+
+function buyFund(id){
+ ensureBank();
+
+ let f=fundById(id);
+ if(!f)return alert("基金不存在");
+
+ let amount=Math.floor(Number(document.getElementById("fundBuy_"+id)?.value||0));
+
+ if(amount<=0)return alert("请输入买入金额");
+
+ if(!spend({绑定元宝:amount}))return;
+
+ let price=p().bank.fundPrices[id]||f.base;
+ let units=amount/price;
+ let old=p().bank.funds[id]||{units:0,avg:0};
+
+ let oldCost=old.units*(old.avg||price);
+ let newUnits=old.units+units;
+ let newAvg=Math.floor((oldCost+amount)/newUnits);
+
+ p().bank.funds[id]={units:newUnits,avg:newAvg};
+
+ p().bank.fundTrades.unshift({
+  action:"buy",
+  name:f.name,
+  text:`买入金额绑定元宝×${amount}，成交净值 ${price}，获得份额 ${units.toFixed(4)}。`,
+  time:new Date().toLocaleString()
+ });
+
+ p().bank.fundTrades=p().bank.fundTrades.slice(0,80);
+
+ log(`买入基金 ${f.name}，金额绑定元宝×${amount}。`);
+
+ save();
+ renderAll();
+}
+
+function sellFund(id){
+ ensureBank();
+
+ let f=fundById(id);
+ if(!f)return alert("基金不存在");
+
+ let hold=p().bank.funds[id];
+
+ if(!hold||!hold.units)return alert("你没有持有该基金");
+
+ let price=p().bank.fundPrices[id]||f.base;
+ let value=Math.floor(hold.units*price);
+
+ if(!confirm(`确定全部卖出 ${f.name} 吗？预计获得元宝×${value}`))return;
+
+ delete p().bank.funds[id];
+
+ gainRes({元宝:value});
+
+ p().bank.fundTrades.unshift({
+  action:"sell",
+  name:f.name,
+  text:`卖出份额 ${hold.units.toFixed(4)}，成交净值 ${price}，获得元宝×${value}。`,
+  time:new Date().toLocaleString()
+ });
+
+ p().bank.fundTrades=p().bank.fundTrades.slice(0,80);
+
+ log(`卖出基金 ${f.name}，获得元宝×${value}。`);
+
+ save();
+ renderAll();
+}
 function preloadBlackMarket(){
  if(!acc||!pwdCache)return;
  if(blackMarketState||blackMarketLoading)return;
@@ -2906,7 +3343,7 @@ function loadBlackMarket(done,silent=false){
 function renderBlackMarket(){
  blackMarketIntro();
 
- const box=document.getElementById("page-blackMarket");
+ const box=document.getElementById(page==="bank"?"bankContent":"page-blackMarket");
  if(!box)return;
 
 if(!blackMarketState){
