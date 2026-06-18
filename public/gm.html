@@ -5,171 +5,324 @@
 <meta name="viewport" content="width=device-width,initial-scale=1.0">
 <title>山河余烬 GM 后台</title>
 <style>
-:root{--bg:#120d09;--p:#241a12;--line:#684a2b;--gold:#e0ad4f;--txt:#f6e7c8;--mut:#bba17a;--red:#c95a4d;--green:#60b866}
+:root{
+ --bg:#0e0b08;
+ --panel:#1e160f;
+ --panel2:#2b1f15;
+ --line:#684a2b;
+ --gold:#e0ad4f;
+ --txt:#f6e7c8;
+ --mut:#bba17a;
+ --red:#d85b50;
+ --green:#61c06a;
+ --blue:#74b7ff;
+}
 *{box-sizing:border-box}
-body{margin:0;background:radial-gradient(circle at top,#3c2917,#120d09 58%);color:var(--txt);font-family:"Microsoft YaHei",Arial,sans-serif}
-header{padding:16px;border-bottom:1px solid var(--line);background:rgba(18,13,9,.96);display:flex;justify-content:space-between;gap:12px;align-items:center}
-h1,h2,h3{color:var(--gold);margin:0 0 12px}
-main{padding:16px;display:grid;grid-template-columns:320px 1fr;gap:16px}
-.card{background:rgba(36,26,18,.94);border:1px solid var(--line);border-radius:14px;padding:16px;box-shadow:0 10px 30px rgba(0,0,0,.25)}
+body{
+ margin:0;
+ background:radial-gradient(circle at top,#3a2918,#0e0b08 60%);
+ color:var(--txt);
+ font-family:"Microsoft YaHei",Arial,sans-serif;
+}
+header{
+ position:sticky;
+ top:0;
+ z-index:9;
+ padding:14px 18px;
+ background:rgba(14,11,8,.96);
+ border-bottom:1px solid var(--line);
+ display:flex;
+ gap:12px;
+ align-items:center;
+ justify-content:space-between;
+ flex-wrap:wrap;
+}
+h1,h2,h3{color:var(--gold);margin:0 0 10px}
+h1{font-size:24px}
+button,input,textarea,select{font-family:inherit}
+input,textarea,select{
+ width:100%;
+ padding:9px;
+ border:1px solid var(--line);
+ border-radius:8px;
+ background:#100b07;
+ color:var(--txt);
+}
+textarea{min-height:90px;resize:vertical}
+button{
+ background:linear-gradient(#8b5a24,#5b3416);
+ color:#fff0c8;
+ border:1px solid var(--gold);
+ border-radius:8px;
+ padding:8px 12px;
+ cursor:pointer;
+}
+button:hover{filter:brightness(1.12)}
+button:disabled{opacity:.45;cursor:not-allowed}
+.btn-red{
+ background:linear-gradient(#9a3129,#5c1814);
+ border-color:#ff9a8e;
+}
+.btn-green{
+ background:linear-gradient(#3d8b42,#225426);
+ border-color:#9bef9b;
+}
+.btn-blue{
+ background:linear-gradient(#2e5f93,#193a5d);
+ border-color:#74b7ff;
+}
+.wrap{
+ display:grid;
+ grid-template-columns:320px 1fr;
+ gap:14px;
+ padding:14px;
+}
+.card{
+ background:rgba(30,22,15,.94);
+ border:1px solid var(--line);
+ border-radius:14px;
+ padding:14px;
+ box-shadow:0 8px 24px rgba(0,0,0,.25);
+}
 .grid{display:grid;gap:12px}
 .two{grid-template-columns:repeat(2,minmax(0,1fr))}
-label{display:block;color:var(--mut);font-size:13px;margin:8px 0 5px}
-input,textarea,select{width:100%;padding:9px;border:1px solid var(--line);border-radius:8px;background:#100b07;color:var(--txt);font-family:inherit}
-textarea{min-height:120px;resize:vertical}
-button{background:linear-gradient(#8b5a24,#5b3416);color:#fff0c8;border:1px solid var(--gold);border-radius:8px;padding:8px 12px;cursor:pointer;margin:4px 4px 4px 0}
-button:hover{filter:brightness(1.12)}
-.bad{color:#ff9a8e}.ok{color:#9bef9b}.muted{color:var(--mut);font-size:13px;line-height:1.6}
+.three{grid-template-columns:repeat(3,minmax(0,1fr))}
+.four{grid-template-columns:repeat(4,minmax(0,1fr))}
+.row{display:flex;gap:8px;flex-wrap:wrap;align-items:center}
+.muted{color:var(--mut);font-size:13px;line-height:1.6}
+.good{color:var(--green)}
+.bad{color:#ff9a8e}
+.gold{color:var(--gold)}
+.blue{color:var(--blue)}
+.hr{border:0;border-top:1px solid var(--line);margin:14px 0}
+.list{display:grid;gap:8px;max-height:620px;overflow:auto}
+.player{
+ background:#100b07;
+ border:1px solid var(--line);
+ border-radius:10px;
+ padding:10px;
+ cursor:pointer;
+}
+.player:hover{border-color:var(--gold)}
+.player.active{border-color:var(--gold);box-shadow:0 0 12px rgba(224,173,79,.28)}
+.tag{
+ display:inline-block;
+ padding:2px 7px;
+ border-radius:999px;
+ border:1px solid var(--line);
+ font-size:12px;
+ color:var(--mut);
+ margin-left:4px;
+}
+.tag.red{color:#ff9a8e;border-color:#9a3129}
+.tag.green{color:#9bef9b;border-color:#3d8b42}
+.kv{
+ display:grid;
+ grid-template-columns:130px 1fr;
+ gap:8px;
+ padding:5px 0;
+ border-bottom:1px solid rgba(255,255,255,.06);
+}
 .table{width:100%;border-collapse:collapse;font-size:13px}
-.table th,.table td{border:1px solid var(--line);padding:8px;text-align:left;vertical-align:top}
-.table th{color:var(--gold);background:#1b120c}
-pre{white-space:pre-wrap;background:#100b07;border:1px solid var(--line);border-radius:10px;padding:10px;max-height:360px;overflow:auto}
-.status{min-height:24px;margin-top:8px}
-@media(max-width:950px){main,.two{grid-template-columns:1fr}}
+.table th,.table td{border:1px solid var(--line);padding:7px;text-align:left}
+.table th{background:#100b07;color:var(--gold)}
+.small{font-size:12px}
+.log{
+ height:220px;
+ overflow:auto;
+ background:#100b07;
+ border:1px solid var(--line);
+ border-radius:10px;
+ padding:10px;
+ font-size:13px;
+ line-height:1.6;
+}
+.danger-zone{
+ border-color:#c95a4d;
+ box-shadow:0 0 20px rgba(201,90,77,.18);
+}
+@media(max-width:1050px){
+ .wrap{grid-template-columns:1fr}
+ .two,.three,.four{grid-template-columns:1fr}
+}
 </style>
 </head>
 <body>
+
 <header>
-  <div>
-    <h1>山河余烬 GM 后台</h1>
-    <div class="muted">发道具、封禁、禁言、公告、玩家查询</div>
-  </div>
-  <button onclick="clearKey()">清除密钥</button>
+ <div>
+  <h1>山河余烬 GM 后台</h1>
+  <div class="muted">功能：查询玩家、封号、禁言、发送道具、公告、清空大地图</div>
+ </div>
+ <div class="row">
+  <input id="gmKey" style="width:260px" placeholder="输入 GM 密钥">
+  <button onclick="saveKey()">保存密钥</button>
+  <button onclick="loadPlayers()">刷新玩家</button>
+ </div>
 </header>
 
-<main>
-  <section class="grid">
-    <div class="card">
-      <h2>GM 登录</h2>
-      <label>GM 密钥</label>
-      <input id="gmKey" type="password" placeholder="输入服务器 GM_KEY">
-      <button onclick="saveKey()">保存密钥</button>
-      <p class="muted">默认密钥如果没改，是：shanhe-gm-123456</p>
-    </div>
+<div class="wrap">
+ <aside class="card">
+  <h2>玩家列表</h2>
+  <div class="row">
+   <input id="searchAcc" placeholder="搜索账号/用户名" oninput="renderPlayers()">
+  </div>
+  <p class="muted">点击玩家后，可查看详情、封号、禁言、发邮件。</p>
+  <div id="playersBox" class="list"></div>
+ </aside>
 
-    <div class="card">
-      <h2>玩家查询</h2>
-      <label>玩家账号</label>
-      <input id="queryAcc" placeholder="例如 player001">
-      <button onclick="loadPlayer()">查询玩家</button>
-      <button onclick="loadPlayers()">刷新玩家列表</button>
-      <div id="status" class="status muted"></div>
-    </div>
-
-    <div class="card">
-      <h2>全服公告</h2>
-      <label>公告内容</label>
-      <textarea id="announcementText" maxlength="160" placeholder="最多160字，会显示在游戏顶部横幅"></textarea>
-      <button onclick="sendAnnouncement()">发布公告</button>
-      <button onclick="clearAnnouncement()">清除公告</button>
-    </div>
+ <main class="grid">
+  <section class="card">
+   <h2>当前选中玩家</h2>
+   <div id="playerDetail" class="muted">尚未选择玩家。</div>
   </section>
 
-  <section class="grid">
-    <div class="card">
-      <h2>发邮件道具</h2>
-      <div class="grid two">
-        <div>
-          <label>玩家账号</label>
-          <input id="mailAcc" placeholder="目标玩家账号">
-        </div>
-        <div>
-          <label>邮件标题</label>
-          <input id="mailTitle" value="GM 补偿邮件">
-        </div>
-      </div>
-
-      <label>邮件内容</label>
-      <textarea id="mailContent">GM 发放奖励，请领取附件。</textarea>
-
-      <label>奖励 JSON</label>
-      <textarea id="rewardJson">{
-  "res": {
-    "绑定元宝": 1000,
-    "招募令": 10,
-    "铜钱": 5000
-  },
-  "bag": {
-    "六星异世自选箱": 1
-  },
-  "frags": {}
-}</textarea>
-
-      <button onclick="sendMail()">发送到玩家邮箱</button>
-      <button onclick="fillBetaReward()">填入内测礼包</button>
-      <button onclick="fillSmallReward()">填入小补偿</button>
+  <section class="card">
+   <h2>封号 / 禁言</h2>
+   <div class="grid two">
+    <div>
+     <h3>封号操作</h3>
+     <input id="banReason" placeholder="封号原因，例如：作弊、刷资源">
+     <br><br>
+     <div class="row">
+      <button class="btn-red" onclick="banSelected(true)">封号</button>
+      <button class="btn-green" onclick="banSelected(false)">解封</button>
+     </div>
     </div>
-
-    <div class="card">
-      <h2>处罚管理</h2>
-      <div class="grid two">
-        <div>
-          <label>玩家账号</label>
-          <input id="punishAcc" placeholder="目标玩家账号">
-        </div>
-        <div>
-          <label>原因</label>
-          <input id="punishReason" placeholder="例如：违规发言 / 测试封禁">
-        </div>
-      </div>
-      <button onclick="setBan(true)">封禁</button>
-      <button onclick="setBan(false)">解封</button>
-      <button onclick="setMute(true)">禁言</button>
-      <button onclick="setMute(false)">解除禁言</button>
+    <div>
+     <h3>禁言操作</h3>
+     <input id="muteReason" placeholder="禁言原因，例如：辱骂、广告">
+     <br><br>
+     <div class="row">
+      <button class="btn-red" onclick="muteSelected(true)">禁言</button>
+      <button class="btn-green" onclick="muteSelected(false)">解除禁言</button>
+     </div>
     </div>
-
-    <div class="card">
-      <h2>玩家信息</h2>
-      <pre id="playerInfo">暂无</pre>
-    </div>
-
-    <div class="card">
-      <h2>玩家列表</h2>
-      <div id="playerList" class="muted">点击“刷新玩家列表”。</div>
-    </div>
+   </div>
   </section>
-</main>
+
+  <section class="card">
+   <h2>发送游戏内道具</h2>
+   <p class="muted">
+    奖励会以邮件附件形式发送。当前游戏前端支持的附件类型是：
+    <b>res</b>、<b>bag</b>、<b>frags</b>。
+   </p>
+
+   <div class="grid two">
+    <div>
+     <h3>邮件内容</h3>
+     <input id="mailTitle" value="GM 补偿邮件" placeholder="邮件标题">
+     <br><br>
+     <textarea id="mailContent" placeholder="邮件正文">GM 发放奖励，请领取附件。</textarea>
+    </div>
+
+    <div>
+     <h3>快捷礼包</h3>
+     <div class="row">
+      <button onclick="fillSmallGift()">小补偿</button>
+      <button onclick="fillBigGift()">大补偿</button>
+      <button onclick="fillTestGift()">测试礼包</button>
+      <button class="btn-blue" onclick="fillAllItemsGift()">全道具礼包</button>
+      <button onclick="clearRewardForm()">清空奖励</button>
+     </div>
+     <p class="muted">“全道具礼包”会填入主要资源、货币、招募令、宝箱。</p>
+    </div>
+   </div>
+
+   <hr class="hr">
+
+   <h3>资源 / 货币 / 道具栏 res</h3>
+   <div id="resInputs" class="grid four"></div>
+
+   <hr class="hr">
+
+   <h3>背包道具 bag</h3>
+   <div id="bagInputs" class="grid three"></div>
+
+   <hr class="hr">
+
+   <h3>武将碎片 frags</h3>
+   <p class="muted">格式：武将ID=数量。比如：1号武将碎片 80 个，就填 ID=1，数量=80。</p>
+   <div class="grid two">
+    <input id="fragId" type="number" min="1" placeholder="武将ID，例如 1">
+    <input id="fragNum" type="number" min="1" placeholder="碎片数量，例如 80">
+   </div>
+
+   <hr class="hr">
+
+   <h3>高级：直接编辑奖励 JSON</h3>
+   <p class="muted">
+    如果你不懂 JSON，可以不用改这里。点击“根据上方表单生成 JSON”即可。
+   </p>
+   <textarea id="rewardJson"></textarea>
+   <br><br>
+   <div class="row">
+    <button onclick="buildRewardJson()">根据上方表单生成 JSON</button>
+    <button class="btn-green" onclick="sendMailToSelected()">发送邮件给选中玩家</button>
+   </div>
+  </section>
+
+  <section class="card">
+   <h2>公告管理</h2>
+   <div class="grid two">
+    <div>
+     <textarea id="announcementText" placeholder="公告内容，最多160字"></textarea>
+     <br><br>
+     <button onclick="sendAnnouncement()">发布公告</button>
+     <button class="btn-red" onclick="clearAnnouncement()">清除公告</button>
+    </div>
+    <div class="muted">
+     公告会显示在游戏顶部横幅。  
+     适合发布维护通知、补偿说明、活动通知。
+    </div>
+   </div>
+  </section>
+
+  <section class="card danger-zone">
+   <h2 class="bad">危险操作：清空大地图</h2>
+   <p class="muted">
+    这个操作会清空所有地块归属、驻守队伍和敌军状态。  
+    所有玩家的驻守队伍会被改回空闲。  
+    玩家账号、资源、武将、邮件不会删除。
+   </p>
+   <input id="clearMapConfirm" placeholder="输入 清空大地图 才能执行">
+   <br><br>
+   <button class="btn-red" onclick="clearWorldMap()">清空大地图</button>
+  </section>
+
+  <section class="card">
+   <h2>操作日志</h2>
+   <div id="logBox" class="log"></div>
+  </section>
+ </main>
+</div>
 
 <script>
-let gmKey=localStorage.getItem("shanhe_gm_key")||"";
-gmKeyInput();
+let gmKey = localStorage.getItem("shanhe_gm_key") || "";
+let players = [];
+let selectedAcc = "";
 
-function gmKeyInput(){
- document.getElementById("gmKey").value=gmKey;
+const resNames = [
+ "粮草","木材","石料","铁矿","铜钱","兵源",
+ "绑定元宝","元宝","招募令","限定招募令",
+ "将魂","战法残卷","赛季功勋","强者令",
+ "同盟贡献"
+];
+
+const bagNames = [
+ "传说碎片宝箱",
+ "五星异世自选箱",
+ "六星异世自选箱"
+];
+
+function $(id){
+ return document.getElementById(id);
 }
 
-function setStatus(text, ok=false){
- const el=document.getElementById("status");
- el.textContent=text;
- el.className=ok?"status ok":"status bad";
-}
-
-function saveKey(){
- gmKey=document.getElementById("gmKey").value.trim();
- localStorage.setItem("shanhe_gm_key",gmKey);
- setStatus("GM 密钥已保存",true);
-}
-
-function clearKey(){
- localStorage.removeItem("shanhe_gm_key");
- gmKey="";
- gmKeyInput();
- setStatus("GM 密钥已清除");
-}
-
-async function api(url, options={}){
- gmKey=document.getElementById("gmKey").value.trim()||gmKey;
- const res=await fetch(url,{
-  ...options,
-  headers:{
-   "Content-Type":"application/json",
-   "x-gm-key":gmKey,
-   ...(options.headers||{})
-  }
- });
- const data=await res.json();
- if(!data.ok)throw new Error(data.message||"请求失败");
- return data;
+function log(text){
+ const box = $("logBox");
+ const time = new Date().toLocaleTimeString();
+ box.innerHTML = `<div>${time} - ${escapeHtml(text)}</div>` + box.innerHTML;
 }
 
 function escapeHtml(s){
@@ -182,163 +335,451 @@ function escapeHtml(s){
  }[c]));
 }
 
-async function loadPlayers(){
+function saveKey(){
+ gmKey = $("gmKey").value.trim();
+ localStorage.setItem("shanhe_gm_key", gmKey);
+ log("GM 密钥已保存。");
+}
+
+function api(path, options={}){
+ const headers = options.headers || {};
+ headers["x-gm-key"] = gmKey;
+
+ if(options.body && !headers["Content-Type"]){
+  headers["Content-Type"] = "application/json";
+ }
+
+ return fetch(path, {
+  ...options,
+  headers
+ }).then(r=>r.json());
+}
+
+function initInputs(){
+ $("gmKey").value = gmKey;
+
+ $("resInputs").innerHTML = resNames.map(name=>`
+  <div>
+   <label class="muted">${name}</label>
+   <input class="resInput" data-name="${name}" type="number" value="0">
+  </div>
+ `).join("");
+
+ $("bagInputs").innerHTML = bagNames.map(name=>`
+  <div>
+   <label class="muted">${name}</label>
+   <input class="bagInput" data-name="${name}" type="number" value="0">
+  </div>
+ `).join("");
+
+ buildRewardJson();
+}
+
+function loadPlayers(){
+ if(!gmKey){
+  alert("请先输入 GM 密钥");
+  return;
+ }
+
+ api("/api/gm/players").then(data=>{
+  if(!data.ok){
+   alert(data.message||"读取玩家失败");
+   return;
+  }
+
+  players = data.players || [];
+  renderPlayers();
+  log(`已读取玩家列表，共 ${players.length} 人。`);
+ }).catch(()=>{
+  alert("连接服务器失败");
+ });
+}
+
+function renderPlayers(){
+ const q = $("searchAcc").value.trim().toLowerCase();
+
+ let list = players.filter(p=>{
+  if(!q)return true;
+  return String(p.acc||"").toLowerCase().includes(q) ||
+         String(p.name||"").toLowerCase().includes(q);
+ });
+
+ $("playersBox").innerHTML = list.map(p=>`
+  <div class="player ${p.acc===selectedAcc?"active":""}" onclick="selectPlayer('${escapeAttr(p.acc)}')">
+   <b>${escapeHtml(p.name)}</b>
+   <div class="muted">账号：${escapeHtml(p.acc)}</div>
+   <div class="small">
+    ${p.banned?`<span class="tag red">封号</span>`:`<span class="tag green">正常</span>`}
+    ${p.muted?`<span class="tag red">禁言</span>`:`<span class="tag green">可发言</span>`}
+   </div>
+   <div class="muted small">更新时间：${p.updated_at?new Date(p.updated_at).toLocaleString():"未知"}</div>
+  </div>
+ `).join("") || `<div class="muted">没有玩家。</div>`;
+}
+
+function escapeAttr(s){
+ return String(s||"").replace(/'/g,"\\'");
+}
+
+function selectPlayer(acc){
+ selectedAcc = acc;
+ renderPlayers();
+ loadPlayerDetail(acc);
+}
+
+function loadPlayerDetail(acc){
+ api(`/api/gm/player/${encodeURIComponent(acc)}`).then(data=>{
+  if(!data.ok){
+   alert(data.message||"读取玩家详情失败");
+   return;
+  }
+
+  renderPlayerDetail(data.player);
+  log(`已读取玩家详情：${acc}`);
+ }).catch(()=>{
+  alert("连接服务器失败");
+ });
+}
+
+function renderPlayerDetail(p){
+ $("playerDetail").innerHTML = `
+  <div class="grid two">
+   <div>
+    <div class="kv"><b>账号</b><span>${escapeHtml(p.acc)}</span></div>
+    <div class="kv"><b>用户名</b><span>${escapeHtml(p.name)}</span></div>
+    <div class="kv"><b>同盟</b><span>${escapeHtml(p.alliance||"无")}</span></div>
+    <div class="kv"><b>封号</b><span class="${p.banned?"bad":"good"}">${p.banned?"是":"否"}</span></div>
+    <div class="kv"><b>封号原因</b><span>${escapeHtml(p.banReason||"")}</span></div>
+    <div class="kv"><b>禁言</b><span class="${p.muted?"bad":"good"}">${p.muted?"是":"否"}</span></div>
+    <div class="kv"><b>禁言原因</b><span>${escapeHtml(p.muteReason||"")}</span></div>
+    <div class="kv"><b>更新时间</b><span>${p.updatedAt?new Date(p.updatedAt).toLocaleString():"未知"}</span></div>
+   </div>
+   <div>
+    <h3>资源</h3>
+    ${objectTable(p.res||{})}
+   </div>
+  </div>
+
+  <hr class="hr">
+
+  <div class="grid two">
+   <div>
+    <h3>背包</h3>
+    ${objectTable(p.bag||{})}
+   </div>
+   <div>
+    <h3>邮件</h3>
+    <div class="list" style="max-height:260px">
+     ${(p.mails||[]).slice(0,20).map(m=>`
+      <div class="player">
+       <b>${escapeHtml(m.title)}</b>
+       <div class="muted">${escapeHtml(m.time||"")}</div>
+       <div class="${m.claimed?"good":"bad"}">${m.claimed?"已领取":"未领取"}</div>
+      </div>
+     `).join("") || `<div class="muted">暂无邮件。</div>`}
+    </div>
+   </div>
+  </div>
+ `;
+}
+
+function objectTable(obj){
+ const rows = Object.entries(obj||{});
+ if(!rows.length)return `<div class="muted">无</div>`;
+
+ return `<table class="table">
+  <tr><th>名称</th><th>数量</th></tr>
+  ${rows.map(([k,v])=>`<tr><td>${escapeHtml(k)}</td><td>${v}</td></tr>`).join("")}
+ </table>`;
+}
+
+function needSelected(){
+ if(!selectedAcc){
+  alert("请先选择玩家");
+  return false;
+ }
+ return true;
+}
+
+function banSelected(banned){
+ if(!needSelected())return;
+
+ const reason = $("banReason").value.trim();
+
+ if(banned && !confirm(`确定封禁账号 ${selectedAcc} 吗？`))return;
+
+ api("/api/gm/ban",{
+  method:"POST",
+  body:JSON.stringify({
+   acc:selectedAcc,
+   banned,
+   reason
+  })
+ }).then(data=>{
+  if(!data.ok){
+   alert(data.message||"操作失败");
+   return;
+  }
+
+  log(`${banned?"封禁":"解封"}账号：${selectedAcc}`);
+  loadPlayers();
+  loadPlayerDetail(selectedAcc);
+ }).catch(()=>alert("连接服务器失败"));
+}
+
+function muteSelected(muted){
+ if(!needSelected())return;
+
+ const reason = $("muteReason").value.trim();
+
+ if(muted && !confirm(`确定禁言账号 ${selectedAcc} 吗？`))return;
+
+ api("/api/gm/mute",{
+  method:"POST",
+  body:JSON.stringify({
+   acc:selectedAcc,
+   muted,
+   reason
+  })
+ }).then(data=>{
+  if(!data.ok){
+   alert(data.message||"操作失败");
+   return;
+  }
+
+  log(`${muted?"禁言":"解除禁言"}账号：${selectedAcc}`);
+  loadPlayers();
+  loadPlayerDetail(selectedAcc);
+ }).catch(()=>alert("连接服务器失败"));
+}
+
+function clearRewardForm(){
+ document.querySelectorAll(".resInput,.bagInput").forEach(i=>i.value=0);
+ $("fragId").value="";
+ $("fragNum").value="";
+ buildRewardJson();
+}
+
+function fillSmallGift(){
+ clearRewardForm();
+ setRes("绑定元宝",1000);
+ setRes("铜钱",5000);
+ setRes("粮草",5000);
+ setRes("木材",3000);
+ setRes("石料",3000);
+ setRes("铁矿",3000);
+ setRes("招募令",3);
+ buildRewardJson();
+}
+
+function fillBigGift(){
+ clearRewardForm();
+ setRes("绑定元宝",10000);
+ setRes("元宝",1000);
+ setRes("铜钱",50000);
+ setRes("粮草",50000);
+ setRes("木材",30000);
+ setRes("石料",30000);
+ setRes("铁矿",30000);
+ setRes("兵源",5000);
+ setRes("招募令",20);
+ setRes("限定招募令",10);
+ setRes("战法残卷",3000);
+ setRes("将魂",1000);
+ buildRewardJson();
+}
+
+function fillTestGift(){
+ clearRewardForm();
+ setRes("绑定元宝",100000);
+ setRes("元宝",10000);
+ setRes("铜钱",200000);
+ setRes("粮草",200000);
+ setRes("木材",200000);
+ setRes("石料",200000);
+ setRes("铁矿",200000);
+ setRes("兵源",50000);
+ setRes("招募令",100);
+ setRes("限定招募令",100);
+ setRes("战法残卷",20000);
+ setRes("将魂",5000);
+ setRes("赛季功勋",5000);
+ setRes("强者令",500);
+ setBag("传说碎片宝箱",20);
+ setBag("五星异世自选箱",5);
+ setBag("六星异世自选箱",3);
+ buildRewardJson();
+}
+
+function fillAllItemsGift(){
+ clearRewardForm();
+
+ for(const name of resNames){
+  if(name==="绑定元宝")setRes(name,100000);
+  else if(name==="元宝")setRes(name,10000);
+  else if(name==="招募令"||name==="限定招募令")setRes(name,100);
+  else if(name==="强者令")setRes(name,1000);
+  else if(name==="战法残卷")setRes(name,50000);
+  else if(name==="将魂")setRes(name,10000);
+  else if(name==="赛季功勋")setRes(name,10000);
+  else if(name==="同盟贡献")setRes(name,10000);
+  else setRes(name,200000);
+ }
+
+ for(const name of bagNames){
+  if(name==="传说碎片宝箱")setBag(name,50);
+  else setBag(name,10);
+ }
+
+ buildRewardJson();
+}
+
+function setRes(name,value){
+ document.querySelectorAll(".resInput").forEach(i=>{
+  if(i.dataset.name===name)i.value=value;
+ });
+}
+
+function setBag(name,value){
+ document.querySelectorAll(".bagInput").forEach(i=>{
+  if(i.dataset.name===name)i.value=value;
+ });
+}
+
+function buildRewardJson(){
+ const reward = {res:{},bag:{},frags:{}};
+
+ document.querySelectorAll(".resInput").forEach(i=>{
+  const v = Math.floor(Number(i.value||0));
+  if(v>0)reward.res[i.dataset.name]=v;
+ });
+
+ document.querySelectorAll(".bagInput").forEach(i=>{
+  const v = Math.floor(Number(i.value||0));
+  if(v>0)reward.bag[i.dataset.name]=v;
+ });
+
+ const fragId = Math.floor(Number($("fragId").value||0));
+ const fragNum = Math.floor(Number($("fragNum").value||0));
+
+ if(fragId>0 && fragNum>0){
+  reward.frags[String(fragId)] = fragNum;
+ }
+
+ if(!Object.keys(reward.res).length)delete reward.res;
+ if(!Object.keys(reward.bag).length)delete reward.bag;
+ if(!Object.keys(reward.frags).length)delete reward.frags;
+
+ $("rewardJson").value = JSON.stringify(reward,null,2);
+}
+
+function parseRewardJson(){
  try{
-  const data=await api("/api/gm/players");
-  const rows=data.players||[];
-  document.getElementById("playerList").innerHTML=`<table class="table">
-   <tr><th>账号</th><th>用户名</th><th>状态</th><th>操作</th></tr>
-   ${rows.map(p=>`<tr>
-    <td>${escapeHtml(p.acc)}</td>
-    <td>${escapeHtml(p.name)}</td>
-    <td>${p.banned?"封禁 ":""}${p.muted?"禁言":""}${!p.banned&&!p.muted?"正常":""}</td>
-    <td><button onclick="quickSelect('${escapeHtml(p.acc)}')">选择</button></td>
-   </tr>`).join("")}
-  </table>`;
-  setStatus("玩家列表已刷新",true);
+  const reward = JSON.parse($("rewardJson").value||"{}");
+  return reward;
  }catch(e){
-  setStatus(e.message);
+  alert("奖励 JSON 格式错误");
+  return null;
  }
 }
 
-function quickSelect(acc){
- document.getElementById("queryAcc").value=acc;
- document.getElementById("mailAcc").value=acc;
- document.getElementById("punishAcc").value=acc;
- loadPlayer();
+function sendMailToSelected(){
+ if(!needSelected())return;
+
+ const reward = parseRewardJson();
+ if(!reward)return;
+
+ const title = $("mailTitle").value.trim() || "GM 邮件";
+ const content = $("mailContent").value.trim() || "请领取附件。";
+
+ if(!confirm(`确定给 ${selectedAcc} 发送邮件吗？`))return;
+
+ api("/api/gm/mail",{
+  method:"POST",
+  body:JSON.stringify({
+   acc:selectedAcc,
+   title,
+   content,
+   reward
+  })
+ }).then(data=>{
+  if(!data.ok){
+   alert(data.message||"发送失败");
+   return;
+  }
+
+  log(`已给 ${selectedAcc} 发送邮件：${title}`);
+  loadPlayerDetail(selectedAcc);
+ }).catch(()=>alert("连接服务器失败"));
 }
 
-async function loadPlayer(){
- const acc=document.getElementById("queryAcc").value.trim();
- if(!acc)return alert("请输入玩家账号");
+function sendAnnouncement(){
+ const text = $("announcementText").value.trim();
 
- try{
-  const data=await api("/api/gm/player/"+encodeURIComponent(acc));
-  document.getElementById("playerInfo").textContent=JSON.stringify(data.player,null,2);
-  document.getElementById("mailAcc").value=acc;
-  document.getElementById("punishAcc").value=acc;
-  setStatus("玩家信息已读取",true);
- }catch(e){
-  setStatus(e.message);
+ if(!text){
+  alert("请输入公告内容");
+  return;
  }
+
+ api("/api/gm/announcement",{
+  method:"POST",
+  body:JSON.stringify({text})
+ }).then(data=>{
+  if(!data.ok){
+   alert(data.message||"发布失败");
+   return;
+  }
+
+  log("已发布公告。");
+ }).catch(()=>alert("连接服务器失败"));
 }
 
-async function sendMail(){
- const acc=document.getElementById("mailAcc").value.trim();
- const title=document.getElementById("mailTitle").value.trim();
- const content=document.getElementById("mailContent").value.trim();
- let reward={};
+function clearAnnouncement(){
+ if(!confirm("确定清除当前公告吗？"))return;
 
- try{
-  reward=JSON.parse(document.getElementById("rewardJson").value);
- }catch(e){
-  return alert("奖励 JSON 格式错误");
+ api("/api/gm/announcement/clear",{
+  method:"POST",
+  body:JSON.stringify({})
+ }).then(data=>{
+  if(!data.ok){
+   alert(data.message||"清除失败");
+   return;
+  }
+
+  log("已清除公告。");
+ }).catch(()=>alert("连接服务器失败"));
+}
+
+function clearWorldMap(){
+ const confirmText = $("clearMapConfirm").value.trim();
+
+ if(confirmText !== "清空大地图"){
+  alert("请在输入框中输入：清空大地图");
+  return;
  }
 
- if(!acc)return alert("请输入玩家账号");
- if(!title)return alert("请输入邮件标题");
+ if(!confirm("危险操作：确定清空整个大地图吗？"))return;
+ if(!confirm("再次确认：所有地块归属和驻守都会被清空。"))return;
 
- try{
-  await api("/api/gm/mail",{
-   method:"POST",
-   body:JSON.stringify({acc,title,content,reward})
-  });
-  setStatus("邮件已发送到玩家邮箱",true);
- }catch(e){
-  setStatus(e.message);
- }
+ api("/api/gm/world/clear",{
+  method:"POST",
+  body:JSON.stringify({})
+ }).then(data=>{
+  if(!data.ok){
+   alert(data.message||"清空失败");
+   return;
+  }
+
+  log(`已清空大地图。影响玩家：${data.playersUpdated||0}，清空地块：${data.tilesUpdated||0}`);
+  $("clearMapConfirm").value="";
+ }).catch(()=>alert("连接服务器失败"));
 }
 
-function fillBetaReward(){
- document.getElementById("rewardJson").value=JSON.stringify({
-  res:{
-   绑定元宝:100000,
-   招募令:100
-  },
-  bag:{
-   六星异世自选箱:1
-  },
-  frags:{}
- },null,2);
-}
-
-function fillSmallReward(){
- document.getElementById("rewardJson").value=JSON.stringify({
-  res:{
-   绑定元宝:500,
-   铜钱:5000,
-   粮草:10000,
-   木材:5000,
-   石料:5000,
-   铁矿:5000
-  },
-  bag:{},
-  frags:{}
- },null,2);
-}
-
-async function setBan(banned){
- const acc=document.getElementById("punishAcc").value.trim();
- const reason=document.getElementById("punishReason").value.trim();
-
- if(!acc)return alert("请输入玩家账号");
-
- try{
-  await api("/api/gm/ban",{
-   method:"POST",
-   body:JSON.stringify({acc,banned,reason})
-  });
-  setStatus(banned?"已封禁玩家":"已解封玩家",true);
-  loadPlayer();
- }catch(e){
-  setStatus(e.message);
- }
-}
-
-async function setMute(muted){
- const acc=document.getElementById("punishAcc").value.trim();
- const reason=document.getElementById("punishReason").value.trim();
-
- if(!acc)return alert("请输入玩家账号");
-
- try{
-  await api("/api/gm/mute",{
-   method:"POST",
-   body:JSON.stringify({acc,muted,reason})
-  });
-  setStatus(muted?"已禁言玩家":"已解除禁言",true);
-  loadPlayer();
- }catch(e){
-  setStatus(e.message);
- }
-}
-
-async function sendAnnouncement(){
- const text=document.getElementById("announcementText").value.trim();
- if(!text)return alert("请输入公告内容");
-
- try{
-  await api("/api/gm/announcement",{
-   method:"POST",
-   body:JSON.stringify({text})
-  });
-  setStatus("公告已发布",true);
- }catch(e){
-  setStatus(e.message);
- }
-}
-
-async function clearAnnouncement(){
- try{
-  await api("/api/gm/announcement/clear",{
-   method:"POST",
-   body:JSON.stringify({})
-  });
-  setStatus("公告已清除",true);
- }catch(e){
-  setStatus(e.message);
- }
+initInputs();
+if(gmKey){
+ loadPlayers();
 }
 </script>
+
 </body>
 </html>

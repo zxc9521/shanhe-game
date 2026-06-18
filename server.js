@@ -1366,6 +1366,101 @@ app.post("/api/gm/announcement/clear", requireGm, (req, res) => {
   });
 });
 
+app.post("/api/gm/world/clear", requireGm, (req, res) => {
+  db.serialize(() => {
+    db.run("BEGIN TRANSACTION");
+
+    db.run(
+      `
+      UPDATE world_tiles
+      SET owner = '',
+          owner_acc = '',
+          garrisonTeam = '',
+          enemy = 0
+      `,
+      [],
+      function (tileErr) {
+        if (tileErr) {
+          db.run("ROLLBACK");
+          return sendError(res, "清空大地图失败");
+        }
+
+        const tilesUpdated = this.changes || 0;
+
+        db.all("SELECT acc, player FROM users", [], (userErr, rows) => {
+          if (userErr) {
+            db.run("ROLLBACK");
+            return sendError(res, "读取玩家数据失败");
+          }
+
+          let index = 0;
+          let playersUpdated = 0;
+
+          function next() {
+            if (index >= rows.length) {
+              db.run("COMMIT", commitErr => {
+                if (commitErr) return sendError(res, "提交清空操作失败");
+
+                sendOk(res, {
+                  tilesUpdated,
+                  playersUpdated
+                });
+              });
+              return;
+            }
+
+            const row = rows[index++];
+            let player = {};
+
+            try {
+              player = JSON.parse(row.player || "{}");
+            } catch (e) {
+              player = {};
+            }
+
+            let changed = false;
+
+            if (player.map) {
+              player.map = {};
+              changed = true;
+            }
+
+            if (Array.isArray(player.teams)) {
+              for (const team of player.teams) {
+                if (team.status === "驻守" || team.tile) {
+                  team.status = "空闲";
+                  team.tile = "";
+                  changed = true;
+                }
+              }
+            }
+
+            if (changed) {
+              playersUpdated++;
+
+              db.run(
+                "UPDATE users SET player = ?, updated_at = ? WHERE acc = ?",
+                [JSON.stringify(player), Date.now(), row.acc],
+                saveErr => {
+                  if (saveErr) {
+                    db.run("ROLLBACK");
+                    return sendError(res, "更新玩家队伍状态失败");
+                  }
+
+                  next();
+                }
+              );
+            } else {
+              next();
+            }
+          }
+
+          next();
+        });
+      }
+    );
+  });
+});
 app.listen(PORT, "0.0.0.0", () => {
   console.log("山河余烬服务器已启动：http://0.0.0.0:80");
   console.log("GM 后台地址：http://服务器IP/gm.html");
