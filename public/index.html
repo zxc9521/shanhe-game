@@ -123,13 +123,18 @@ h2,h3{color:var(--gold);margin:0 0 12px}.grid{display:grid;gap:12px}.two{grid-te
 .boss-bubble:after{content:"";position:absolute;left:-8px;top:35px;border-top:8px solid transparent;border-bottom:8px solid transparent;border-right:9px solid #100b07}
 .boss-countdown{color:#ff9a8e;font-weight:700;margin-top:8px}
 @media(max-width:1050px){.boss-panel{grid-template-columns:80px 1fr}.boss-avatar{width:80px;height:80px}}
-.guide-mask{position:fixed;inset:0;background:rgba(0,0,0,.58);z-index:9998;display:grid;place-items:center;padding:18px}
-.guide-box{width:min(560px,100%);background:linear-gradient(145deg,#2b1b10,#120b07);border:1px solid var(--gold);border-radius:18px;padding:18px;box-shadow:0 0 38px rgba(224,173,79,.32)}
-.guide-title{font-size:24px;color:var(--gold);font-weight:900;margin-bottom:10px}
-.guide-text{line-height:1.8;color:var(--txt);white-space:pre-wrap}
-.guide-actions{display:flex;gap:8px;flex-wrap:wrap;justify-content:flex-end;margin-top:16px}
-.guide-step{color:var(--mut);font-size:13px;margin-top:10px}
+.guide-mask{position:fixed;inset:0;background:rgba(0,0,0,.48);z-index:9998;pointer-events:auto}
+.guide-box{position:fixed;left:50%;bottom:24px;transform:translateX(-50%);width:min(720px,calc(100% - 32px));background:linear-gradient(145deg,#2b1b10,#120b07);border:1px solid var(--gold);border-radius:18px;padding:16px 18px 16px 132px;box-shadow:0 0 38px rgba(224,173,79,.32);z-index:10002;min-height:148px}
+.guide-npc{position:absolute;left:12px;bottom:0;width:112px;height:150px;object-fit:contain;filter:drop-shadow(0 0 14px rgba(224,173,79,.4))}
+.guide-title{font-size:22px;color:var(--gold);font-weight:900;margin-bottom:8px}
+.guide-text{line-height:1.75;color:var(--txt);white-space:pre-wrap}
+.guide-actions{display:flex;gap:8px;flex-wrap:wrap;justify-content:flex-end;margin-top:12px}
+.guide-step{color:var(--mut);font-size:13px;margin-top:8px}
+.guide-highlight{position:fixed;border:3px solid var(--gold);border-radius:14px;box-shadow:0 0 0 9999px rgba(0,0,0,.42),0 0 24px rgba(224,173,79,.85);z-index:10000;pointer-events:none;transition:all .18s}
+.guide-pointer{position:fixed;width:74px;height:74px;background:url("./assets/images/guide/guide_pointer.png") center/contain no-repeat;z-index:10001;pointer-events:none;animation:guidePointerBounce .8s infinite alternate}
 .guide-glow{outline:3px solid var(--gold)!important;box-shadow:0 0 20px rgba(224,173,79,.55)!important;position:relative;z-index:9999}
+@keyframes guidePointerBounce{from{transform:translate(0,0)}to{transform:translate(8px,8px)}}
+@media(max-width:700px){.guide-box{padding:14px;bottom:12px}.guide-npc{display:none}}
 .task-card{display:grid;grid-template-columns:1fr auto;gap:10px;align-items:center}
 .task-progress{height:10px;background:#100b07;border:1px solid var(--line);border-radius:999px;overflow:hidden;margin:8px 0}
 .task-progress-fill{height:100%;background:linear-gradient(90deg,#8b5a24,#e0ad4f);width:0}
@@ -143,6 +148,12 @@ h2,h3{color:var(--gold);margin:0 0 12px}.grid{display:grid;gap:12px}.two{grid-te
 .avatar-choice.active{border-color:var(--gold);box-shadow:0 0 16px rgba(224,173,79,.35)}
 .avatar-choice img{width:64px;height:64px;border-radius:10px;object-fit:cover;background:#100b07;border:1px solid var(--line)}
 .avatar-choice div{font-size:12px;color:var(--mut);margin-top:4px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.avatar-mask{position:fixed;inset:0;background:rgba(0,0,0,.62);z-index:10000;display:grid;place-items:center;padding:18px}
+.avatar-panel{width:min(760px,100%);max-height:86vh;overflow:auto;background:linear-gradient(145deg,#2b1b10,#120b07);border:1px solid var(--gold);border-radius:18px;padding:18px;box-shadow:0 0 38px rgba(224,173,79,.32)}
+.avatar-panel-head{display:flex;align-items:center;justify-content:space-between;gap:10px;margin-bottom:12px}
+.avatar-close{background:linear-gradient(#7d3428,#4d1d17);border-color:#ff9a8e}
+.player-avatar{cursor:pointer}
+.player-avatar:hover{filter:brightness(1.12);box-shadow:0 0 16px rgba(224,173,79,.45)}
 </style>
 </head>
 <body>
@@ -173,7 +184,7 @@ h2,h3{color:var(--gold);margin:0 0 12px}.grid{display:grid;gap:12px}.two{grid-te
 <div id="announcementBar" class="announce"></div>
 <header>
   <div class="player-head">
-  <img id="playerAvatar" class="player-avatar" src="./assets/images/avatars/avatar_general_male.png">
+  <img id="playerAvatar" class="player-avatar" src="./assets/images/avatars/avatar_general_male.png" onclick="openAvatarPanel()" title="点击更换头像">
   <div>
     <div class="brand">山河余烬</div>
     <div id="pinfo" class="muted"></div>
@@ -617,48 +628,63 @@ function resourceIcon(name){
 const guideSteps=[
  {
   title:"欢迎来到山河余烬",
-  text:"将军，山河破碎，玄旌王朝正在逼近。\n\n你将从一座小城开始，建设建筑、招募武将、征兵组队、占领土地，并在赛季入侵中活下来。\n\n接下来我会带你走一遍基础流程。",
-  page:"home"
+  text:"将军，山河破碎，玄旌王朝正在逼近。\n\n接下来我会用高亮光标带你熟悉基础流程。",
+  page:"home",
+  target:"#playerAvatar"
  },
  {
   title:"第一步：查看主页建筑",
-  text:"这里是你的主城。\n\n普通建筑负责解锁功能，生产建筑负责自动产出资源。\n\n建议前期优先升级：官府、军营、仓库。",
-  page:"home"
+  text:"这里是你的主城建筑区。\n\n普通建筑负责解锁功能，生产建筑负责自动产出资源。\n\n建议前期优先升级：官府、军营、仓库。",
+  page:"home",
+  target:"#page-home"
  },
  {
-  title:"第二步：领取邮箱奖励",
-  text:"主页下方是邮箱。\n\n活动奖励、GM补偿、副本奖励、兑换奖励都会先进入邮箱。\n\n如果你看到未领取邮件，可以点击“一键领取全部附件”。",
-  page:"home"
+  title:"第二步：更换头像",
+  text:"点击左上角头像，可以打开头像选择界面。\n\n你可以选择系统头像，也可以使用已拥有的武将头像。",
+  page:"home",
+  target:"#playerAvatar"
  },
  {
-  title:"第三步：征兵",
-  text:"现在去征兵页。\n\n征兵会消耗粮草、木材、铁矿和兵源。\n\n兵源就是可训练的新兵人口，训练后会进入兵种库存。",
-  page:"barracks"
+  title:"第三步：领取邮箱奖励",
+  text:"主页下方是邮箱。\n\n活动奖励、GM补偿、副本奖励、兑换奖励都会先进入邮箱。\n\n看到未领取邮件时，可以点击“一键领取全部附件”。",
+  page:"home",
+  target:"#page-home .mail-badge, #page-home button[onclick='claimAllMail()']"
  },
  {
-  title:"第四步：创建军队",
+  title:"第四步：征兵",
+  text:"现在去征兵页。\n\n征兵会消耗粮草、木材、铁矿和兵源。\n\n兵源就是可训练的新兵人口。",
+  page:"barracks",
+  target:"button[onclick=\"show('barracks')\"]"
+ },
+ {
+  title:"第五步：创建军队",
   text:"现在去军队页。\n\n选择一个武将，再分配士兵，就可以创建队伍。\n\n队伍创建后才能去地图占领地块。",
-  page:"teams"
+  page:"teams",
+  target:"button[onclick=\"show('teams')\"]"
  },
  {
-  title:"第五步：打开大地图",
+  title:"第六步：打开大地图",
   text:"这里是共享大地图。\n\n所有玩家看到的是同一个世界。\n\n点击地块后，可以侦查，也可以派军队进攻占领。",
-  page:"map"
+  page:"map",
+  target:"button[onclick=\"show('map')\"]"
  },
  {
-  title:"第六步：注意玄旌王朝",
+  title:"第七步：注意玄旌王朝",
   text:"地图上方的反派 Boss 会不断威胁你。\n\n倒计时结束后，玄旌禁军会入侵地图，占领部分地块。\n\n在那之前，尽量提升军队实力。",
-  page:"map"
+  page:"map",
+  target:".boss-panel"
  },
  {
-  title:"第七步：武将培养",
+  title:"第八步：武将培养",
   text:"武将决定队伍强度。\n\n你可以升级武将、提升战法、筛选整理武将。\n\n高星武将获得时还会触发世界横幅通报。",
-  page:"heroes"
+  page:"heroes",
+  target:"button[onclick=\"show('heroes')\"]"
  },
  {
-  title:"第八步：探索更多系统",
+  title:"第九步：探索更多系统",
   text:"你已经掌握基础玩法。\n\n接下来可以尝试：副本、种田、市场、黑市、聊天、同盟、限时活动。\n\n祝你在山河余烬中活到最后。",
   page:"home",
+  target:"nav",
   finish:true
  }
 ];
@@ -696,7 +722,56 @@ function showGuideStep(index){
  stepText.textContent=`教程进度：${index+1} / ${guideSteps.length}`;
 
  mask.classList.remove("hidden");
+
+ setTimeout(()=>updateGuideHighlight(step),120);
+
  save();
+}
+function guideTargetElement(selector){
+ if(!selector)return null;
+
+ let selectors=selector.split(",").map(x=>x.trim()).filter(Boolean);
+
+ for(let s of selectors){
+  let el=document.querySelector(s);
+  if(el)return el;
+ }
+
+ return null;
+}
+
+function updateGuideHighlight(step){
+ const highlight=document.getElementById("guideHighlight");
+ const pointer=document.getElementById("guidePointer");
+
+ if(!highlight||!pointer)return;
+
+ const el=guideTargetElement(step.target);
+
+ if(!el){
+  highlight.classList.add("hidden");
+  pointer.classList.add("hidden");
+  return;
+ }
+
+ const rect=el.getBoundingClientRect();
+ const pad=8;
+
+ highlight.style.left=Math.max(8,rect.left-pad)+"px";
+ highlight.style.top=Math.max(8,rect.top-pad)+"px";
+ highlight.style.width=Math.min(window.innerWidth-16,rect.width+pad*2)+"px";
+ highlight.style.height=Math.min(window.innerHeight-16,rect.height+pad*2)+"px";
+ highlight.classList.remove("hidden");
+
+ pointer.style.left=Math.min(window.innerWidth-86,rect.right+10)+"px";
+ pointer.style.top=Math.min(window.innerHeight-86,rect.top+Math.min(30,rect.height/2))+"px";
+ pointer.classList.remove("hidden");
+
+ el.scrollIntoView({
+  behavior:"smooth",
+  block:"center",
+  inline:"center"
+ });
 }
 
 function nextGuide(){
@@ -726,6 +801,10 @@ function finishGuide(){
 
  const mask=document.getElementById("guideMask");
  if(mask)mask.classList.add("hidden");
+ const highlight=document.getElementById("guideHighlight");
+ const pointer=document.getElementById("guidePointer");
+ if(highlight)highlight.classList.add("hidden");
+ if(pointer)pointer.classList.add("hidden");
 
  log("完成新手教程。");
  renderAll();
@@ -769,6 +848,7 @@ function renderPlayerAvatar(){
 function setPlayerAvatar(type,value){
  p().avatar={type,value};
  log("已更换玩家头像。");
+ closeAvatarPanel();
  renderAll();
 }
 
@@ -800,6 +880,33 @@ function renderAvatarPicker(){
   <h3>已拥有武将头像</h3>
   <div class="avatar-grid">${heroHtml||"<div class='muted'>暂无武将头像。</div>"}</div>
  </div>`;
+}
+function openAvatarPanel(){
+ if(!acc||!p())return;
+
+ let old=document.getElementById("avatarMask");
+ if(old)old.remove();
+
+ const mask=document.createElement("div");
+ mask.id="avatarMask";
+ mask.className="avatar-mask";
+ mask.innerHTML=`<div class="avatar-panel">
+  <div class="avatar-panel-head">
+   <div>
+    <h2>更换头像</h2>
+    <p class="muted">可以选择系统头像，也可以使用你已拥有的武将头像。</p>
+   </div>
+   <button class="avatar-close" onclick="closeAvatarPanel()">关闭</button>
+  </div>
+  ${renderAvatarPicker()}
+ </div>`;
+
+ document.body.appendChild(mask);
+}
+
+function closeAvatarPanel(){
+ const mask=document.getElementById("avatarMask");
+ if(mask)mask.remove();
 }
 function renderAll(){
  pinfo.textContent=`用户名：${p().name}｜账号：${p().a}｜未读邮件 ${unreadMailCount()} 封`;
@@ -994,7 +1101,6 @@ function renderHome(){
   </div>`;
  }
 
-html+=renderAvatarPicker();
  html+=`</div>
  <hr class="hr">
  <h2>邮箱 ${unreadMailCount()?`<span class="mail-badge">${unreadMailCount()}</span>`:""}</h2>
@@ -3417,6 +3523,17 @@ setInterval(()=>{
  }
 },5000);
 
+window.addEventListener("resize",()=>{
+ if(!acc||!p()||!p().guide||p().guide.done)return;
+ let step=guideSteps[p().guide.step||0];
+ if(step)updateGuideHighlight(step);
+});
+
+window.addEventListener("scroll",()=>{
+ if(!acc||!p()||!p().guide||p().guide.done)return;
+ let step=guideSteps[p().guide.step||0];
+ if(step)updateGuideHighlight(step);
+},true);
 if(acc&&pwdCache){
  fetch("/api/login",{
   method:"POST",
@@ -3434,7 +3551,10 @@ if(acc&&pwdCache){
 }
 </script>
 <div id="guideMask" class="guide-mask hidden">
+  <div id="guideHighlight" class="guide-highlight hidden"></div>
+  <div id="guidePointer" class="guide-pointer hidden"></div>
   <div class="guide-box">
+    <img class="guide-npc" src="./assets/images/guide/guide_npc.png" onerror="this.style.display='none'">
     <div id="guideTitle" class="guide-title"></div>
     <div id="guideText" class="guide-text"></div>
     <div id="guideStep" class="guide-step"></div>
