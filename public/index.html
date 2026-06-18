@@ -77,7 +77,7 @@ h2,h3{color:var(--gold);margin:0 0 12px}.grid{display:grid;gap:12px}.two{grid-te
 .building-info{min-width:0}
 .map-icon{width:48px;height:48px;object-fit:contain;display:block;margin-bottom:4px}
 .tile{position:relative}
-.tile-owner-avatar{position:absolute;right:5px;top:5px;width:24px;height:24px;border-radius:50%;border:1px solid var(--gold);object-fit:cover;background:#100b07;box-shadow:0 0 8px rgba(0,0,0,.55)}
+.tile-owner-avatar{position:absolute;right:5px;top:5px;width:24px;height:24px;border-radius:50%;border:1px solid var(--gold);object-fit:cover;background:#100b07;box-shadow:0 0 8px rgba(0,0,0,.55);z-index:3}
 .troop-icon{width:22px;height:22px;object-fit:contain;vertical-align:-6px;margin-right:4px}
 .troop-mini-row{display:flex;gap:2px;flex-wrap:wrap;align-items:center;margin-top:8px}
 .troop-mini{width:18px;height:18px;object-fit:contain}
@@ -1104,7 +1104,9 @@ const mapIconMap={
 };
 
 function tileOwnerAvatar(tile){
- if(!tile||!tile.ownerAvatar)return "";
+ if(!tile||!tile.ownerAvatar){
+  return "./assets/images/avatars/avatar_general_male.png";
+ }
 
  let av=tile.ownerAvatar;
 
@@ -1117,8 +1119,8 @@ function tileOwnerAvatar(tile){
 }
 
 function tileOwnerAvatarHtml(tile){
- if(!tile||!tile.ownerAcc||tile.ownerAcc===acc)return "";
- return `<img class="tile-owner-avatar" src="${tileOwnerAvatar(tile)}" onerror="this.style.display='none'">`;
+ if(!tile||!tile.ownerAcc)return "";
+ return `<img class="tile-owner-avatar" src="${tileOwnerAvatar(tile)}" onerror="this.src='./assets/images/avatars/avatar_general_male.png'">`;
 }
 
 function mapIcon(type){
