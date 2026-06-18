@@ -14,6 +14,25 @@ const BLACK_MARKET_CACHE_MS = 30 * 1000;
 let blackMarketCache = null;
 let blackMarketCacheAt = 0;
 
+const teamDungeonRooms = {};
+let teamDungeonRoomSeq = 1;
+
+const TEAM_DUNGEONS = {
+  xuanjing_vanguard: {
+    id: "xuanjing_vanguard",
+    name: "玄旌王朝的先遣部队",
+    desc: "玄旌王朝派出的侦察军，适合两名玩家组队挑战。",
+    power: 9000,
+    rewardRate6: 0.015
+  },
+  xuanjing_elite: {
+    id: "xuanjing_elite",
+    name: "玄旌王朝的先遣精英部队",
+    desc: "玄旌王朝精锐先遣军，难度更高，奖励更好。",
+    power: 18000,
+    rewardRate6: 0.035
+  }
+};
 const BLACK_MARKET_ASSETS = [
   { id: "qin_heavy", name: "大秦重工", base: 1000 },
   { id: "donghai_salt", name: "东海制盐", base: 850 },
@@ -240,6 +259,7 @@ function normalizeReward(reward) {
     if (reward.res && typeof reward.res === "object") safe.res = reward.res;
     if (reward.bag && typeof reward.bag === "object") safe.bag = reward.bag;
     if (reward.frags && typeof reward.frags === "object") safe.frags = reward.frags;
+    if (Array.isArray(reward.heroes)) safe.heroes = reward.heroes;
   }
 
   return safe;
@@ -446,6 +466,113 @@ function getBlackMarketCached(callback) {
 
     callback(null, assets);
   });
+}
+function teamDungeonRoomList() {
+  return Object.values(teamDungeonRooms)
+    .filter(room => room.status !== "closed")
+    .sort((a, b) => b.createdAt - a.createdAt)
+    .slice(0, 50);
+}
+
+function publicTeamDungeonRoom(room) {
+  return {
+    id: room.id,
+    dungeonId: room.dungeonId,
+    dungeonName: TEAM_DUNGEONS[room.dungeonId]?.name || room.dungeonId,
+    status: room.status,
+    createdAt: room.createdAt,
+    members: room.members.map(m => ({
+      acc: m.acc,
+      name: m.name,
+      teamId: m.teamId,
+      teamName: m.teamName,
+      power: m.power,
+      ready: m.ready
+    })),
+    result: room.result || null,
+    flipped: room.flipped || {}
+  };
+}
+
+function playerTeamPowerForDungeon(player, teamId) {
+  const teams = Array.isArray(player.teams) ? player.teams : [];
+  const team = teams.find(t => t.id === teamId);
+
+  if (!team) return null;
+  if (team.status !== "空闲") return null;
+
+  const total = Number(team.total || 0);
+  const troopScore = total * 12;
+
+  const hero = Array.isArray(player.heroes)
+    ? player.heroes.find(h => h.uid === team.heroUid)
+    : null;
+
+  const heroScore = hero ? ((hero.lv || 1) * 300 + (hero.skillLv || 1) * 500) : 0;
+
+  return {
+    team,
+    power: Math.floor(troopScore + heroScore)
+  };
+}
+
+function teamDungeonReward(dungeon) {
+  const roll = Math.random();
+
+  if (roll < dungeon.rewardRate6) {
+    return {
+      title: "六星异世武将整卡",
+      reward: { heroes: [45 + Math.floor(Math.random() * 5)] }
+    };
+  }
+
+  if (roll < 0.20) {
+    return {
+      title: "六星异世碎片",
+      reward: { frags: { [45 + Math.floor(Math.random() * 5)]: 2 } }
+    };
+  }
+
+  if (roll < 0.55) {
+    return {
+      title: "限定招募令",
+      reward: { res: { 限定招募令: 2, 绑定元宝: 800 } }
+    };
+  }
+
+  return {
+    title: "军需补给",
+    reward: { res: { 绑定元宝: 500, 铜钱: 8000, 粮草: 8000, 战法残卷: 300 } }
+  };
+}
+
+function finishTeamDungeonRoom(room) {
+  const dungeon = TEAM_DUNGEONS[room.dungeonId];
+  const totalPower = room.members.reduce((sum, m) => sum + (m.power || 0), 0);
+  const randomFactor = 0.85 + Math.random() * 0.3;
+  const finalPower = Math.floor(totalPower * randomFactor);
+  const win = finalPower >= dungeon.power;
+
+  room.status = "finished";
+  room.result = {
+    win,
+    totalPower,
+    finalPower,
+    enemyPower: dungeon.power,
+    text: win ? "挑战成功，开始翻牌领取奖励。" : "挑战失败，玄旌军压制了你们的攻势。"
+  };
+
+  room.cards = [teamDungeonReward(dungeon), teamDungeonReward(dungeon), teamDungeonReward(dungeon)];
+
+  if (!win) {
+    room.cards = [
+      { title: "参与奖励", reward: { res: { 铜钱: 3000, 粮草: 3000 } } },
+      { title: "参与奖励", reward: { res: { 铜钱: 3000, 木材: 3000 } } },
+      { title: "参与奖励", reward: { res: { 铜钱: 3000, 战法残卷: 100 } } }
+    ];
+  }
+
+  room.flipped = {};
 }
 function addMailToPlayer(player, title, content, reward) {
   if (!player.mails) player.mails = [];
@@ -1459,6 +1586,185 @@ app.post("/api/gm/world/clear", requireGm, (req, res) => {
         });
       }
     );
+  });
+});
+app.get("/api/team-dungeon/list", (req, res) => {
+  const acc = String(req.query.acc || "");
+  const pwd = String(req.query.pwd || "");
+
+  verifyUser(acc, pwd, (err, user, message) => {
+    if (err) return sendError(res, "数据库错误");
+    if (!user) return sendError(res, message);
+    if (user.banned) return sendError(res, "账号已被封禁");
+
+    sendOk(res, {
+      dungeons: Object.values(TEAM_DUNGEONS),
+      rooms: teamDungeonRoomList().map(publicTeamDungeonRoom)
+    });
+  });
+});
+
+app.post("/api/team-dungeon/create", (req, res) => {
+  const { acc, pwd, dungeonId } = req.body || {};
+  const dungeon = TEAM_DUNGEONS[dungeonId];
+
+  if (!dungeon) return sendError(res, "副本不存在");
+
+  verifyUser(acc, pwd, (err, user, message) => {
+    if (err) return sendError(res, "数据库错误");
+    if (!user) return sendError(res, message);
+    if (user.banned) return sendError(res, "账号已被封禁");
+
+    const roomId = "td_" + teamDungeonRoomSeq++;
+
+    teamDungeonRooms[roomId] = {
+      id: roomId,
+      dungeonId,
+      leaderAcc: acc,
+      status: "waiting",
+      createdAt: Date.now(),
+      members: []
+    };
+
+    sendOk(res, { room: publicTeamDungeonRoom(teamDungeonRooms[roomId]) });
+  });
+});
+
+app.post("/api/team-dungeon/join", (req, res) => {
+  const { acc, pwd, roomId } = req.body || {};
+  const room = teamDungeonRooms[roomId];
+
+  if (!room) return sendError(res, "房间不存在");
+  if (room.status !== "waiting") return sendError(res, "房间已经开始");
+  if (room.members.length >= 2) return sendError(res, "房间已满");
+
+  verifyUser(acc, pwd, (err, user, message) => {
+    if (err) return sendError(res, "数据库错误");
+    if (!user) return sendError(res, message);
+    if (user.banned) return sendError(res, "账号已被封禁");
+
+    if (room.members.some(m => m.acc === acc)) {
+      return sendOk(res, { room: publicTeamDungeonRoom(room) });
+    }
+
+    room.members.push({
+      acc,
+      name: user.name,
+      teamId: "",
+      teamName: "",
+      power: 0,
+      ready: false
+    });
+
+    sendOk(res, { room: publicTeamDungeonRoom(room) });
+  });
+});
+
+app.post("/api/team-dungeon/leave", (req, res) => {
+  const { acc, pwd, roomId } = req.body || {};
+  const room = teamDungeonRooms[roomId];
+
+  if (!room) return sendError(res, "房间不存在");
+
+  verifyUser(acc, pwd, (err, user, message) => {
+    if (err) return sendError(res, "数据库错误");
+    if (!user) return sendError(res, message);
+
+    room.members = room.members.filter(m => m.acc !== acc);
+
+    if (!room.members.length) {
+      room.status = "closed";
+    }
+
+    sendOk(res);
+  });
+});
+
+app.post("/api/team-dungeon/ready", (req, res) => {
+  const { acc, pwd, roomId, teamId } = req.body || {};
+  const room = teamDungeonRooms[roomId];
+
+  if (!room) return sendError(res, "房间不存在");
+  if (room.status !== "waiting") return sendError(res, "房间已经开始");
+
+  verifyUser(acc, pwd, (err, user, message) => {
+    if (err) return sendError(res, "数据库错误");
+    if (!user) return sendError(res, message);
+    if (user.banned) return sendError(res, "账号已被封禁");
+
+    const member = room.members.find(m => m.acc === acc);
+    if (!member) return sendError(res, "你不在该房间");
+
+    const teamInfo = playerTeamPowerForDungeon(user.player, teamId);
+    if (!teamInfo) return sendError(res, "请选择空闲军队");
+
+    member.teamId = teamId;
+    member.teamName = teamInfo.team.name;
+    member.power = teamInfo.power;
+    member.ready = true;
+
+    if (room.members.length === 2 && room.members.every(m => m.ready)) {
+      finishTeamDungeonRoom(room);
+    }
+
+    sendOk(res, { room: publicTeamDungeonRoom(room) });
+  });
+});
+
+app.get("/api/team-dungeon/room/:id", (req, res) => {
+  const acc = String(req.query.acc || "");
+  const pwd = String(req.query.pwd || "");
+  const room = teamDungeonRooms[req.params.id];
+
+  if (!room) return sendError(res, "房间不存在");
+
+  verifyUser(acc, pwd, (err, user, message) => {
+    if (err) return sendError(res, "数据库错误");
+    if (!user) return sendError(res, message);
+
+    sendOk(res, { room: publicTeamDungeonRoom(room) });
+  });
+});
+
+app.post("/api/team-dungeon/flip", (req, res) => {
+  const { acc, pwd, roomId, cardIndex } = req.body || {};
+  const room = teamDungeonRooms[roomId];
+  const index = Number(cardIndex);
+
+  if (!room) return sendError(res, "房间不存在");
+  if (room.status !== "finished") return sendError(res, "副本尚未结算");
+  if (!room.members.some(m => m.acc === acc)) return sendError(res, "你不在该房间");
+  if (![0, 1, 2].includes(index)) return sendError(res, "翻牌错误");
+  if (room.flipped[acc]) return sendError(res, "你已经翻过牌了");
+
+  verifyUser(acc, pwd, (err, user, message) => {
+    if (err) return sendError(res, "数据库错误");
+    if (!user) return sendError(res, message);
+
+    const card = room.cards[index];
+
+    const player = user.player;
+    addMailToPlayer(
+      player,
+      "组队副本翻牌奖励：" + card.title,
+      "你完成了组队副本挑战，翻牌奖励已发放。",
+      card.reward
+    );
+
+    savePlayer(acc, player, saveErr => {
+      if (saveErr) return sendError(res, "发放奖励失败");
+
+      room.flipped[acc] = {
+        index,
+        title: card.title,
+        reward: card.reward
+      };
+
+      sendOk(res, {
+        card: room.flipped[acc],
+        room: publicTeamDungeonRoom(room)
+      });
+    });
   });
 });
 app.listen(PORT, "0.0.0.0", () => {

@@ -32,6 +32,16 @@ h2,h3{color:var(--gold);margin:0 0 12px}.grid{display:grid;gap:12px}.two{grid-te
 .dungeon-story{background:#100b07;border:1px solid var(--line);border-radius:12px;padding:14px;line-height:1.8;white-space:pre-wrap}
 .dungeon-choice{display:block;width:100%;text-align:left;margin:8px 0;padding:10px 12px}
 .dungeon-ending{border:1px solid var(--gold);background:rgba(224,173,79,.08);border-radius:12px;padding:14px;line-height:1.8}
+.team-dungeon-tabs{display:flex;gap:8px;flex-wrap:wrap;margin-bottom:12px}
+.team-room{background:#100b07;border:1px solid var(--line);border-radius:12px;padding:12px}
+.team-room.active{border-color:var(--gold);box-shadow:0 0 14px rgba(224,173,79,.28)}
+.team-member{display:grid;grid-template-columns:1fr auto;gap:8px;align-items:center;background:rgba(255,255,255,.04);border:1px solid rgba(255,255,255,.08);border-radius:10px;padding:8px;margin:6px 0}
+.flip-grid{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:12px;margin-top:12px}
+.flip-card{height:150px;border:1px solid var(--gold);border-radius:14px;background:linear-gradient(145deg,#2b1b10,#100b07);display:grid;place-items:center;text-align:center;cursor:pointer;transition:transform .25s,filter .25s;box-shadow:0 0 18px rgba(224,173,79,.18)}
+.flip-card:hover{transform:translateY(-4px);filter:brightness(1.12)}
+.flip-card.revealed{background:linear-gradient(145deg,#5b3416,#241a12);cursor:default}
+.flip-card b{color:var(--gold)}
+@media(max-width:1050px){.flip-grid{grid-template-columns:1fr}}
 .hero-item{display:grid;grid-template-columns:76px 1fr;gap:12px;align-items:center}
 .hero-avatar{width:76px;height:76px;border-radius:12px;border:1px solid var(--line);object-fit:cover;background:#100b07}
 .hero-info{min-width:0}
@@ -217,6 +227,7 @@ h2,h3{color:var(--gold);margin:0 0 12px}.grid{display:grid;gap:12px}.two{grid-te
   <button onclick="show('teams')">军队</button>
   <button onclick="show('battle')">战斗</button>
 <button onclick="show('dungeon')">副本</button>
+<button onclick="show('teamDungeon')">组队副本</button>
   <button onclick="show('heroes')">武将</button>
   <button onclick="show('recruit')">招募</button>
   <button onclick="show('events')">限时活动</button>
@@ -232,7 +243,7 @@ h2,h3{color:var(--gold);margin:0 0 12px}.grid{display:grid;gap:12px}.two{grid-te
 <main class="content">
   <section id="page-home"></section><section id="page-map" class="hidden"></section>
   <section id="page-barracks" class="hidden"></section><section id="page-teams" class="hidden"></section>
-  <section id="page-battle" class="hidden"></section><section id="page-battleScene" class="hidden"></section><section id="page-dungeon" class="hidden"></section><section id="page-heroes" class="hidden"></section>
+  <section id="page-battle" class="hidden"></section><section id="page-battleScene" class="hidden"></section><section id="page-dungeon" class="hidden"></section><section id="page-teamDungeon" class="hidden"></section><section id="page-heroes" class="hidden"></section>
   <section id="page-recruit" class="hidden"></section><section id="page-events" class="hidden"></section><section id="page-tasks" class="hidden"></section>
   <section id="page-bag" class="hidden"></section><section id="page-farm" class="hidden"></section>
 <section id="page-market" class="hidden"></section><section id="page-bank" class="hidden"></section><section id="page-blackMarket" class="hidden"></section><section id="page-cook" class="hidden"></section><section id="page-alliance" class="hidden"></section>
@@ -306,6 +317,8 @@ let battleReturnTimer=null;
 let battleReturnLeft=0;
 let heroFilterStar="all", heroFilterType="all", heroFilterStatus="all", heroSortMode="star";
 let activeBankTab="deposit";
+let teamDungeonState={dungeons:[],rooms:[],currentRoom:null};
+let teamDungeonTimer=null;
 let activeChat="world", chatTimer=null, chatRendered=false;
 let chatMessages={world:[],alliance:[],private:[]};
 let chatLastId={world:0,alliance:0,private:0};
@@ -410,6 +423,7 @@ function save(){
 }
 function now(){return Date.now()}
 function dayMs(){return 86400000}
+function hourMs(){return 3600000}
 function p(){return db.players[acc]}
 function pick(a){return a[Math.floor(Math.random()*a.length)]}
 function h(id){return heroes.find(x=>x.id==id)}
@@ -592,6 +606,7 @@ function gainReward(reward){
  if(reward.res)gainRes(reward.res);
  if(reward.frags)for(let id in reward.frags)p().frags[id]=(p().frags[id]||0)+reward.frags[id];
  if(reward.bag)for(let k in reward.bag)p().bag[k]=(p().bag[k]||0)+reward.bag[k];
+ if(reward.heroes)for(let id of reward.heroes)addHero(Number(id),"组队副本奖励");
 }
 let lastAnnouncementId=0;
 
@@ -940,17 +955,30 @@ function renderRes(){
 }
 function renderLogs(){logs.innerHTML=p().logs.map(x=>`<div>${x}</div>`).join("")}
 function show(x){
+ if(page==="teamDungeon"&&x!=="teamDungeon"){
+  stopTeamDungeonPolling();
+ }
+
  page=x;
  document.querySelectorAll("main section").forEach(s=>s.classList.add("hidden"));
  document.getElementById("page-"+x).classList.remove("hidden");
  renderPage();
+
  if(x==="chat")startChatPolling();
+ if(x==="teamDungeon")startTeamDungeonPolling();
 }
-function renderPage(){({home:renderHome,map:renderMap,barracks:renderBarracks,teams:renderTeams,battle:renderBattle,battleScene:renderBattleScene,dungeon:renderDungeon,heroes:renderHeroes,recruit:renderRecruit,events:renderEvents,tasks:renderTasks,bag:renderBag,farm:renderFarm,market:renderMarket,bank:renderBank,blackMarket:renderBlackMarket,cook:renderCook,alliance:renderAlliance,chat:renderChat}[page]||renderHome)();renderRes()}
+function renderPage(){({home:renderHome,map:renderMap,barracks:renderBarracks,teams:renderTeams,battle:renderBattle,battleScene:renderBattleScene,dungeon:renderDungeon,teamDungeon:renderTeamDungeon,heroes:renderHeroes,recruit:renderRecruit,events:renderEvents,tasks:renderTasks,bag:renderBag,farm:renderFarm,market:renderMarket,bank:renderBank,blackMarket:renderBlackMarket,cook:renderCook,alliance:renderAlliance,chat:renderChat}[page]||renderHome)();renderRes()}
 function costText(c){
  return Object.entries(c||{}).map(([k,v])=>`${resourceIcon(k)}${k}×${v}`).join("，");
 }
-function rewardText(r){let arr=[];if(r.res)arr.push(costText(r.res));if(r.frags)arr.push(Object.entries(r.frags).map(([id,v])=>`${h(Number(id)).name}碎片×${v}`).join("，"));if(r.bag)arr.push(costText(r.bag));return arr.filter(Boolean).join("，")||"无"}
+function rewardText(r){
+ let arr=[];
+ if(r.res)arr.push(costText(r.res));
+ if(r.frags)arr.push(Object.entries(r.frags).map(([id,v])=>`${h(Number(id)).name}碎片×${v}`).join("，"));
+ if(r.bag)arr.push(costText(r.bag));
+ if(r.heroes)arr.push(r.heroes.map(id=>`${h(Number(id)).name}整卡×1`).join("，"));
+ return arr.filter(Boolean).join("，")||"无";
+}
 function rewardToMail(title,reward,content){p().mails.unshift({id:"mail"+now()+Math.random(),title,content:content||"奖励已发放，请领取附件。",reward,claimed:false,time:new Date().toLocaleString()});log(`收到邮件：${title}`);save()}
 function unreadMailCount(){return p().mails.filter(m=>!m.claimed).length}
 function claimMail(id){let m=p().mails.find(x=>x.id===id);if(!m||m.claimed)return;if(m.reward)gainReward(m.reward);m.claimed=true;log(`领取邮件附件：${m.title}`);renderAll()}
@@ -1388,6 +1416,36 @@ function withdrawGarrison(id){
   alert("撤军连接失败");
  });
 }
+function withdrawTeamFromList(teamId){
+ let tm=p().teams.find(x=>x.id===teamId);
+
+ if(!tm)return alert("队伍不存在");
+ if(tm.status!=="驻守")return alert("该队伍没有驻守");
+ if(!tm.tile)return alert("该队伍没有驻守地块记录");
+
+ if(!confirm(`确定撤回 ${tm.name} 吗？撤回后会放弃该地块驻守。`))return;
+
+ fetch("/api/world/withdraw",{
+  method:"POST",
+  headers:{"Content-Type":"application/json"},
+  body:JSON.stringify({acc,pwd:pwdCache,tileId:tm.tile})
+ }).then(r=>r.json()).then(data=>{
+  if(!data.ok){
+   return alert(data.message||"撤军失败");
+  }
+
+  let tile=p().map[tm.tile];
+  if(tile)tile.garrisonTeam="";
+
+  tm.status="空闲";
+  tm.tile="";
+
+  log(`${tm.name} 已撤回，恢复为空闲状态。`);
+  renderAll();
+ }).catch(()=>{
+  alert("撤军连接失败");
+ });
+}
 function teamName(id){let tm=p().teams.find(x=>x.id===id);return tm?tm.name:"未知"}
 function counterFactor(type,enemyType){if(!enemyType)return 1;return troopTypes[type]?.counter===enemyType?1.18:troopTypes[type]?.weak===enemyType?0.88:1}
 function resolveTileBattle(team,tile){let enemyType=tile.enemy?"骑兵":tile.type==="city"||tile.type==="pass"?"城防":pick(["民兵","步兵","弓兵","枪兵","骑兵"]);let atk=teamPower(team)*counterFactor(mainTroop(team),enemyType)*(0.9+Math.random()*0.2);let def=(tile.guard+(tile.enemy?2500:0))*(tile.garrisonTeam?1.35:1)*(0.9+Math.random()*0.2);let win=atk>=def,loss=Math.ceil(team.total*(win?0.08+Math.random()*0.08:0.18+Math.random()*0.15));applyTeamLoss(team,loss);return {id:"r"+now()+Math.random(),time:new Date().toLocaleString(),title:`${team.name} 进攻 ${tileName(tile.type)} ${tile.x},${tile.y}`,result:win?"胜利":"失败",atk:Math.floor(atk),def:Math.floor(def),loss,enemyType,detail:`兵种克制：我方主力${mainTroop(team)}，敌方${enemyType}。胜利后必须驻守才能保有地块。`}}
@@ -1432,7 +1490,8 @@ function teamCard(tm){
   </div>
 
   <button onclick="changeTeamHero('${tm.id}')">确认更换</button>
-  <button onclick="disbandTeam('${tm.id}')">解散返还士兵</button>
+<button ${tm.status==="驻守"?"":"disabled"} onclick="withdrawTeamFromList('${tm.id}')">撤军</button>
+<button onclick="disbandTeam('${tm.id}')">解散返还士兵</button>
  </div>`;
 }
 
@@ -2009,6 +2068,225 @@ function dungeonDifficultyText(d){
  return `${d.difficulty}｜奖励 ${d.rewardMin}~${d.rewardMax} 绑定元宝`;
 }
 
+function startTeamDungeonPolling(){
+ if(teamDungeonTimer)return;
+
+ fetchTeamDungeonList();
+
+ teamDungeonTimer=setInterval(()=>{
+  if(page==="teamDungeon"){
+   if(teamDungeonState.currentRoom){
+    fetchTeamDungeonRoom(teamDungeonState.currentRoom.id);
+   }else{
+    fetchTeamDungeonList();
+   }
+  }
+ },2000);
+}
+
+function stopTeamDungeonPolling(){
+ if(teamDungeonTimer){
+  clearInterval(teamDungeonTimer);
+  teamDungeonTimer=null;
+ }
+}
+
+function fetchTeamDungeonList(){
+ fetch(`/api/team-dungeon/list?acc=${encodeURIComponent(acc)}&pwd=${encodeURIComponent(pwdCache)}`)
+  .then(r=>r.json())
+  .then(data=>{
+   if(!data.ok)return;
+   teamDungeonState.dungeons=data.dungeons||[];
+   teamDungeonState.rooms=data.rooms||[];
+   renderTeamDungeon();
+  })
+  .catch(()=>{});
+}
+
+function fetchTeamDungeonRoom(roomId){
+ fetch(`/api/team-dungeon/room/${roomId}?acc=${encodeURIComponent(acc)}&pwd=${encodeURIComponent(pwdCache)}`)
+  .then(r=>r.json())
+  .then(data=>{
+   if(!data.ok)return;
+   teamDungeonState.currentRoom=data.room;
+   renderTeamDungeon();
+  })
+  .catch(()=>{});
+}
+
+function renderTeamDungeon(){
+ const box=document.getElementById("page-teamDungeon");
+ if(!box)return;
+
+ startTeamDungeonPolling();
+
+ if(teamDungeonState.currentRoom){
+  box.innerHTML=renderTeamDungeonRoom(teamDungeonState.currentRoom);
+  return;
+ }
+
+ box.innerHTML=`<h2>实时组队副本</h2>
+ <p class="muted">一个房间最多两名玩家。选择空闲军队后准备，两人都准备后自动结算战斗。</p>
+
+ <div class="grid two">
+  <div class="stat">
+   <h3>创建房间</h3>
+   <div class="list">
+    ${teamDungeonState.dungeons.map(d=>`<div class="item">
+     <h3>${d.name}</h3>
+     <p class="muted">${d.desc}</p>
+     <p>推荐战力：<b class="gold">${d.power}</b></p>
+     <button onclick="createTeamDungeonRoom('${d.id}')">创建房间</button>
+    </div>`).join("")||"<div class='muted'>正在读取副本...</div>"}
+   </div>
+  </div>
+
+  <div class="stat">
+   <h3>房间列表</h3>
+   <div class="list">
+    ${teamDungeonState.rooms.map(r=>`<div class="team-room">
+     <h3>${r.dungeonName}</h3>
+     <p class="muted">房间：${r.id}｜人数 ${r.members.length}/2｜状态：${r.status}</p>
+     <div>${r.members.map(m=>`<div class="team-member"><span>${m.name}｜${m.teamName||"未选队伍"}｜战力 ${m.power||0}</span><b>${m.ready?"已准备":"未准备"}</b></div>`).join("")}</div>
+     <button ${r.members.length>=2?"disabled":""} onclick="joinTeamDungeonRoom('${r.id}')">加入房间</button>
+    </div>`).join("")||"<div class='muted'>暂无房间。</div>"}
+   </div>
+  </div>
+ </div>`;
+}
+
+function createTeamDungeonRoom(dungeonId){
+ fetch("/api/team-dungeon/create",{
+  method:"POST",
+  headers:{"Content-Type":"application/json"},
+  body:JSON.stringify({acc,pwd:pwdCache,dungeonId})
+ }).then(r=>r.json()).then(data=>{
+  if(!data.ok)return alert(data.message||"创建失败");
+  teamDungeonState.currentRoom=data.room;
+  joinTeamDungeonRoom(data.room.id);
+ }).catch(()=>alert("创建房间失败"));
+}
+
+function joinTeamDungeonRoom(roomId){
+ fetch("/api/team-dungeon/join",{
+  method:"POST",
+  headers:{"Content-Type":"application/json"},
+  body:JSON.stringify({acc,pwd:pwdCache,roomId})
+ }).then(r=>r.json()).then(data=>{
+  if(!data.ok)return alert(data.message||"加入失败");
+  teamDungeonState.currentRoom=data.room;
+  renderTeamDungeon();
+ }).catch(()=>alert("加入房间失败"));
+}
+
+function leaveTeamDungeonRoom(roomId){
+ fetch("/api/team-dungeon/leave",{
+  method:"POST",
+  headers:{"Content-Type":"application/json"},
+  body:JSON.stringify({acc,pwd:pwdCache,roomId})
+ }).then(r=>r.json()).then(data=>{
+  if(!data.ok)return alert(data.message||"离开失败");
+  teamDungeonState.currentRoom=null;
+  fetchTeamDungeonList();
+ }).catch(()=>alert("离开房间失败"));
+}
+
+function readyTeamDungeon(roomId){
+ let teamId=document.getElementById("teamDungeonTeam")?.value;
+ if(!teamId)return alert("请选择空闲军队");
+
+ fetch("/api/team-dungeon/ready",{
+  method:"POST",
+  headers:{"Content-Type":"application/json"},
+  body:JSON.stringify({acc,pwd:pwdCache,roomId,teamId})
+ }).then(r=>r.json()).then(data=>{
+  if(!data.ok)return alert(data.message||"准备失败");
+  teamDungeonState.currentRoom=data.room;
+  renderTeamDungeon();
+ }).catch(()=>alert("准备失败"));
+}
+
+function renderTeamDungeonRoom(room){
+ let freeTeams=p().teams.filter(t=>t.status==="空闲"&&t.total>=50);
+
+ let myFlip=room.flipped&&room.flipped[acc];
+
+ return `<h2>组队副本房间</h2>
+ <div class="stat">
+  <h3>${room.dungeonName}</h3>
+  <p class="muted">房间：${room.id}｜状态：${room.status}｜人数 ${room.members.length}/2</p>
+
+  <div class="list">
+   ${room.members.map(m=>`<div class="team-member">
+    <span>${m.name}｜${m.teamName||"未选择军队"}｜战力 ${m.power||0}</span>
+    <b class="${m.ready?"ok":"bad"}">${m.ready?"已准备":"未准备"}</b>
+   </div>`).join("")}
+  </div>
+
+  ${room.status==="waiting"?`
+   <hr class="hr">
+   <h3>选择空闲军队</h3>
+   <select id="teamDungeonTeam">
+    ${freeTeams.map(t=>`<option value="${t.id}">${t.name}｜兵力 ${t.total}｜战力 ${teamPower(t)}</option>`).join("")}
+   </select>
+   <br><br>
+   <button onclick="readyTeamDungeon('${room.id}')">准备</button>
+   <button onclick="leaveTeamDungeonRoom('${room.id}')">离开房间</button>
+  `:""}
+
+  ${room.status==="finished"?renderTeamDungeonResult(room,myFlip):""}
+ </div>`;
+}
+
+function renderTeamDungeonResult(room,myFlip){
+ let r=room.result;
+
+ return `<hr class="hr">
+ <h2>战斗结算</h2>
+ <div class="battle-summary">
+  <div class="battle-summary-art ${r.win?"victory":"defeat"}">
+   <div>
+    <div class="battle-summary-title">${r.win?"挑战成功":"挑战失败"}</div>
+    <div class="battle-summary-sub">${r.text}</div>
+   </div>
+  </div>
+
+  <div class="battle-summary-grid">
+   <div class="battle-summary-stat">队伍总战力<b>${r.totalPower}</b></div>
+   <div class="battle-summary-stat">最终战力<b>${r.finalPower}</b></div>
+   <div class="battle-summary-stat">敌军战力<b>${r.enemyPower}</b></div>
+   <div class="battle-summary-stat">结果<b>${r.win?"胜利":"失败"}</b></div>
+  </div>
+
+  <h3>翻牌奖励</h3>
+  ${myFlip?`<div class="ok">你已翻牌：${rewardText(myFlip.reward)}</div>`:`
+   <div class="flip-grid">
+    <div class="flip-card" onclick="flipTeamDungeonCard('${room.id}',0)"><b>奖励牌一</b><span class="muted">点击翻开</span></div>
+    <div class="flip-card" onclick="flipTeamDungeonCard('${room.id}',1)"><b>奖励牌二</b><span class="muted">点击翻开</span></div>
+    <div class="flip-card" onclick="flipTeamDungeonCard('${room.id}',2)"><b>奖励牌三</b><span class="muted">点击翻开</span></div>
+   </div>
+  `}
+
+  <br>
+  <button onclick="teamDungeonState.currentRoom=null;fetchTeamDungeonList()">返回房间列表</button>
+ </div>`;
+}
+
+function flipTeamDungeonCard(roomId,cardIndex){
+ fetch("/api/team-dungeon/flip",{
+  method:"POST",
+  headers:{"Content-Type":"application/json"},
+  body:JSON.stringify({acc,pwd:pwdCache,roomId,cardIndex})
+ }).then(r=>r.json()).then(data=>{
+  if(!data.ok)return alert(data.message||"翻牌失败");
+
+  alert("翻牌成功，奖励已发送到邮箱："+rewardText(data.card.reward));
+
+  teamDungeonState.currentRoom=data.room;
+  renderTeamDungeon();
+  renderAll();
+ }).catch(()=>alert("翻牌失败"));
+}
 function renderDungeon(){
  ensureDungeonData();
 
@@ -2329,9 +2607,27 @@ function addHero(id,source){
  p().recruitLogs=p().recruitLogs.slice(0,60);
 }
 function addFrag(id,num,source){let t=h(id);p().frags[id]=(p().frags[id]||0)+num;p().recruitLogs.unshift({time:new Date().toLocaleString(),source,result:`${t.name}碎片×${num}`});p().recruitLogs=p().recruitLogs.slice(0,60);log(`获得${t.name}碎片×${num}。`)}
-function renderRecruit(){document.getElementById("page-recruit").innerHTML=`<h2>招募</h2><div class="grid two"><div class="stat"><h3>常驻招募</h3><p class="muted">只出普通武将，不会出现异世限定武将。最高 5 星。</p><p>消耗：招募令×1</p><button onclick="drawNormal()">招募一次</button></div><div class="stat"><h3>限定招募：异世武将</h3><p class="muted">本赛季限定池，只出现异世武将。异世武将不进入常驻池。</p><p>消耗：限定招募令×1 或绑定元宝×180</p><button onclick="drawLimited(false)">用限定令</button> <button onclick="drawLimited(true)">用元宝</button></div></div><hr class="hr"><h2>招募记录</h2><div class="list">${p().recruitLogs.map(x=>`<div class="item"><b>${x.source}</b><p>${x.result}</p><p class="muted">${x.time}</p></div>`).join("")||"<div class='item muted'>暂无招募记录。</div>"}</div>`}
+function renderRecruit(){document.getElementById("page-recruit").innerHTML=`<h2>招募</h2><div class="grid two"><div class="stat"><h3>常驻招募</h3><p class="muted">只出普通武将，不会出现异世限定武将。最高 5 星。</p><p>消耗：招募令×1</p><button onclick="drawNormal()">招募一次</button></div><div class="stat"><h3>限定招募：异世武将</h3><p class="muted">本赛季限定池只出现5星异世武将和5星异世碎片。6星只能从强者降临获取，7星只能从传说之路获取。</p><p>消耗：限定招募令×1 或绑定元宝×180</p><button onclick="drawLimited(false)">用限定令</button> <button onclick="drawLimited(true)">用元宝</button></div></div><hr class="hr"><h2>招募记录</h2><div class="list">${p().recruitLogs.map(x=>`<div class="item"><b>${x.source}</b><p>${x.result}</p><p class="muted">${x.time}</p></div>`).join("")||"<div class='item muted'>暂无招募记录。</div>"}</div>`}
 function drawNormal(){if(!spend({招募令:1}))return;let pool=heroes.filter(x=>!x.tag&&x.star<=5);let r=Math.random(),s=r<.04?5:r<.22?4:3;addHero(pick(pool.filter(x=>x.star===s)).id,"常驻招募");renderAll()}
-function drawLimited(gold){if(gold){if(!spend({绑定元宝:180}))return}else if(!spend({限定招募令:1}))return;let pool=heroes.filter(x=>x.tag==="异世武将");let r=Math.random();if(r<.01)addHero(pick(pool.filter(x=>x.star===7)).id,"限定招募");else if(r<.08)addHero(pick(pool.filter(x=>x.star===6)).id,"限定招募");else if(r<.42)addHero(pick(pool.filter(x=>x.star===5)).id,"限定招募");else{let t=pick(pool.filter(x=>x.star<=6));addFrag(t.id,t.star===6?1:3,"限定招募")}renderAll()}
+function drawLimited(gold){
+ if(gold){
+  if(!spend({绑定元宝:180}))return;
+ }else{
+  if(!spend({限定招募令:1}))return;
+ }
+
+ let pool=heroes.filter(x=>x.tag==="异世武将"&&x.star===5);
+ let r=Math.random();
+
+ if(r<.35){
+  addHero(pick(pool).id,"限定招募");
+ }else{
+  let t=pick(pool);
+  addFrag(t.id,3,"限定招募");
+ }
+
+ renderAll();
+}
 
 function setEvent(id){activeEvent=id;renderEvents()}
 let activeTaskTab="daily";
@@ -2850,18 +3146,18 @@ function refreshMarket(force=false){
 }
 
 const depositProducts=[
- {id:"current",name:"活期存款",days:0,daily:0.0003,desc:"可随时取出，按实际存放天数计息。日利率 0.03%。"},
- {id:"fixed7",name:"七日死期",days:7,daily:0.0006,desc:"存满 7 天可取，日利率 0.06%。提前取出没有利息。"},
- {id:"fixed30",name:"三十日死期",days:30,daily:0.0009,desc:"存满 30 天可取，日利率 0.09%。提前取出没有利息。"},
- {id:"fixed90",name:"九十日死期",days:90,daily:0.0012,desc:"存满 90 天可取，日利率 0.12%。提前取出没有利息。"}
+ {id:"current",name:"活期存款",days:0,daily:0.015,desc:"可随时取出，按实际存放天数计息。日利率 1.5%。"},
+ {id:"fixed7",name:"七日死期",days:7,daily:0.020,desc:"存满 7 天可取，日利率 2.0%。提前取出没有利息。"},
+ {id:"fixed30",name:"三十日死期",days:30,daily:0.025,desc:"存满 30 天可取，日利率 2.5%。提前取出没有利息。"},
+ {id:"fixed90",name:"九十日死期",days:90,daily:0.030,desc:"存满 90 天可取，日利率 3.0%。提前取出没有利息。"}
 ];
 
 const fundDefs=[
- {id:"shanhe_stable",name:"山河稳健债基",base:1000,range:0.004,desc:"低风险基金，涨跌很小，适合保守玩家。"},
- {id:"grain_supply",name:"九州粮道基金",base:1000,range:0.007,desc:"投资粮草与运输产业，波动较小。"},
- {id:"forge_industry",name:"铁甲工坊基金",base:1000,range:0.010,desc:"投资铁矿、工坊与军械制造，波动中等。"},
- {id:"border_growth",name:"边关成长基金",base:1000,range:0.014,desc:"投资边关建设与开荒产业，收益和波动略高。"},
- {id:"xuanjing_mix",name:"玄晶混合基金",base:1000,range:0.018,desc:"混合型基金，风险高于普通基金，但低于黑市股票。"}
+ {id:"shanhe_stable",name:"山河稳健债基",base:1000,range:0.0015,desc:"低风险基金，每小时小幅波动，适合保守玩家。"},
+ {id:"grain_supply",name:"九州粮道基金",base:1000,range:0.0025,desc:"投资粮草与运输产业，每小时波动较小。"},
+ {id:"forge_industry",name:"铁甲工坊基金",base:1000,range:0.0035,desc:"投资铁矿、工坊与军械制造，每小时波动中等。"},
+ {id:"border_growth",name:"边关成长基金",base:1000,range:0.0050,desc:"投资边关建设与开荒产业，每小时收益和波动略高。"},
+ {id:"xuanjing_mix",name:"玄晶混合基金",base:1000,range:0.0065,desc:"混合型基金，每小时风险高于普通基金，但低于黑市。"}
 ];
 
 function ensureBank(){
@@ -2885,7 +3181,7 @@ function settleFunds(){
  let b=p().bank;
  let changed=false;
 
- while(now()-b.fundLastUpdate>=dayMs()){
+ while(now()-b.fundLastUpdate>=hourMs()){
   for(let f of fundDefs){
    let oldPrice=b.fundPrices[f.id]||f.base;
    let move=(Math.random()*2-1)*f.range;
@@ -2893,12 +3189,12 @@ function settleFunds(){
    b.fundPrices[f.id]=newPrice;
   }
 
-  b.fundLastUpdate+=dayMs();
+  b.fundLastUpdate+=hourMs();
   changed=true;
  }
 
  if(changed){
-  log("钱庄基金已完成一轮每日净值更新。");
+  log("钱庄基金已完成一轮每小时净值更新。");
   save();
  }
 }
@@ -3136,13 +3432,13 @@ function fundTrendText(f){
 function renderFundPage(){
  ensureBank();
 
- let nextLeft=Math.max(0,dayMs()-(now()-p().bank.fundLastUpdate));
+ let nextLeft=Math.max(0,hourMs()-(now()-p().bank.fundLastUpdate));
  let nextHours=Math.floor(nextLeft/3600000);
  let nextMinutes=Math.floor((nextLeft%3600000)/60000);
 
  return `<div class="stat">
   <h3>基金</h3>
-  <p class="muted">基金每日更新一次净值。涨跌幅小于黑市，风险和收益都更温和。购买消耗绑定元宝，卖出获得元宝。</p>
+  <p class="muted">基金每小时更新一次净值。涨跌幅小于黑市，风险和收益都更温和。购买消耗绑定元宝，卖出获得元宝。</p>
   <p class="muted">距离下次基金净值更新约：${nextHours}小时${nextMinutes}分钟</p>
  </div>
 
@@ -3941,8 +4237,13 @@ spawnInvasionIfNeeded();
    updateFarmTimers();
   }
 
-  if(page==="market"){
+    if(page==="market"){
    renderMarket();
+  }
+
+  if(page==="bank"&&activeBankTab==="fund"){
+   settleFunds();
+   renderBank();
   }
     if(page==="map"){
    bossLineTick++;
